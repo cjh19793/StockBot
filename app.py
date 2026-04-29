@@ -198,6 +198,50 @@ def analyze(ticker):
                      df['Lower'].values.flatten(),
                      df['Upper'].values.flatten(),
                      color='gray', alpha=0.1)
+
+    # ── 최고가 / 최저가 마커 추가 ──────────────────────
+    high_idx = df['High'].idxmax()
+    low_idx  = df['Low'].idxmin()
+    high_val = df['High'].max()
+    low_val  = df['Low'].min()
+
+    # 최고가 마커 (빨간 별)
+    ax1.scatter(high_idx, high_val, color='red', marker='*', s=200, zorder=5, label=f'최고가 {high_val:.2f}')
+    ax1.annotate(
+        f'▲ 최고 {high_val:.2f}',
+        xy=(high_idx, high_val),
+        xytext=(0, 12),
+        textcoords='offset points',
+        ha='center',
+        fontsize=9,
+        fontweight='bold',
+        color='red',
+        bbox=dict(boxstyle='round,pad=0.3', facecolor='#ffebee', edgecolor='red', alpha=0.8)
+    )
+
+    # 최저가 마커 (파란 별)
+    ax1.scatter(low_idx, low_val, color='blue', marker='*', s=200, zorder=5, label=f'최저가 {low_val:.2f}')
+    ax1.annotate(
+        f'▼ 최저 {low_val:.2f}',
+        xy=(low_idx, low_val),
+        xytext=(0, -18),
+        textcoords='offset points',
+        ha='center',
+        fontsize=9,
+        fontweight='bold',
+        color='blue',
+        bbox=dict(boxstyle='round,pad=0.3', facecolor='#e3f2fd', edgecolor='blue', alpha=0.8)
+    )
+    # ────────────────────────────────────────────────────
+
+    if buy_score >= sell_score and buy_score > 0:
+        ax1.set_facecolor('#e8f5e9')
+    elif sell_score > buy_score:
+        ax1.set_facecolor('#ffebee')
+    ax1.set_title(f"{ticker} [1D] — {chart_title} | {now_str}", fontsize=13, fontweight='bold')
+    ax1.legend(loc='upper left', fontsize=8)
+    ax1.grid(True, alpha=0.2)
+
     if buy_score >= sell_score and buy_score > 0:
         ax1.set_facecolor('#e8f5e9')
     elif sell_score > buy_score:
