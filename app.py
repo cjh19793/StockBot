@@ -1,9 +1,7 @@
-import finnhub
-import time
+import yfinance as yf
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
 import pandas as pd
 import numpy as np
 import platform
@@ -24,32 +22,21 @@ plt.rcParams['axes.unicode_minus'] = False
 # 1. 설정
 # ==========================================
 TELEGRAM_TOKEN = '8461695506:AAEnh1QdWuRsztWIx9_uIr59u0lA8uvshXg'
-FINNHUB_KEY    = 'd7oqrfpr01qmthud7v5gd7oqrfpr01qmthud7v60'
 
 # ==========================================
-# 2. Finnhub 데이터 가져오기
+# 2. yfinance 데이터 가져오기
 # ==========================================
-def get_df_from_finnhub(ticker):
-    client = finnhub.Client(api_key=FINNHUB_KEY)
-
-    end   = int(time.time())
-    start = end - 60 * 60 * 24 * 365  # 24시간치 1분봉
-
-    candles = client.stock_candles(ticker, 'D', start, end)
-
-    if candles['s'] != 'ok':
+def get_df(ticker):
+    try:
+        df = yf.download(ticker, period='6mo', interval='1d', progress=False)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.droplevel(1)
+        if df.empty:
+            return None
+        return df
+    except Exception as e:
+        print(f"yfinance 오류: {e}")
         return None
-
-    df = pd.DataFrame({
-        'Open'  : candles['o'],
-        'High'  : candles['h'],
-        'Low'   : candles['l'],
-        'Close' : candles['c'],
-        'Volume': candles['v'],
-    }, index=pd.to_datetime(candles['t'], unit='s'))
-
-    df.index = df.index.tz_localize('UTC').tz_convert('America/New_York')
-    return df
 
 # ==========================================
 # 3. 지표 계산
@@ -163,9 +150,9 @@ def final_judgment(buy_score, sell_score):
 # 5. 분석 + 차트 생성
 # ==========================================
 def analyze(ticker):
-    bar_width = 0.0003  # 1분봉에 맞게 조정
+    bar_width = 0.6  # 일봉 너비
 
-    df = get_df_from_finnhub(ticker)
+    df = get_df(ticker)
     if df is None or df.empty:
         return None, None
 
@@ -179,8 +166,7 @@ def analyze(ticker):
     macd  = get_value(df['MACD'])
     sk    = get_value(df['Stoch_K'])
 
-    # 현재 시각 표시용
-    now_str = df.index[-1].strftime('%Y-%m-%d %H:%M (ET)')
+    now_str = df.index[-1].strftime('%Y-%m-%d')
 
     buy_score, buy_signals, sell_score, sell_signals = detect_signal(df)
     judgment, j_color, chart_title = final_judgment(buy_score, sell_score)
@@ -190,7 +176,7 @@ def analyze(ticker):
     sell_text = "\n".join([f"❌ {s}" for s in sell_signals]) if sell_signals else "없음"
     report = (
         f"🚀 *[{ticker}] 분석 리포트*\n"
-        f"🕐 기준 시각: {now_str}\n"
+        f"🕐 기준일: {now_str}\n"
         f"💰 현재가: {curr:.2f}\n"
         f"📊 거래량: {vol:,.0f}\n"
         f"📈 RSI: {rsi:.1f} | MACD: {macd:.3f} | Stoch K: {sk:.1f}\n"
@@ -216,7 +202,7 @@ def analyze(ticker):
         ax1.set_facecolor('#e8f5e9')
     elif sell_score > buy_score:
         ax1.set_facecolor('#ffebee')
-    ax1.set_title(f"{ticker} [1m] — {chart_title} | {now_str}", fontsize=13, fontweight='bold')
+    ax1.set_title(f"{ticker} [1D] — {chart_title} | {now_str}", fontsize=13, fontweight='bold')
     ax1.legend(loc='upper left', fontsize=8)
     ax1.grid(True, alpha=0.2)
 
@@ -282,7 +268,7 @@ def analyze(ticker):
 # ==========================================
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ticker = update.message.text.strip().upper()
-    await update.message.reply_text(f"🔍 {ticker} 실시간 분석 중... 잠시만 기다려주세요!")
+    await update.message.reply_text(f"🔍 {ticker} 분석 중... 잠시만 기다려주세요!")
 
     report, chart_buf = analyze(ticker)
 
@@ -294,7 +280,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(report, parse_mode='Markdown')
-    await update.message.reply_photo(photo=chart_buf, caption=f"📊 {ticker} 실시간 차트")
+    await update.message.reply_photo(photo=chart_buf, caption=f"📊 {ticker} 일봉 차트")
 
 # ==========================================
 # 7. 봇 실행
