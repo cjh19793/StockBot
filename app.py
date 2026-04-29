@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 import platform
 import io
+
+
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
@@ -21,7 +23,8 @@ plt.rcParams['axes.unicode_minus'] = False
 # ==========================================
 # 1. 설정
 # ==========================================
-TELEGRAM_TOKEN = '8461695506:AAEnh1QdWuRsztWIx9_uIr59u0lA8uvshXg'
+import os
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 
 # ==========================================
 # 2. yfinance 데이터 가져오기
