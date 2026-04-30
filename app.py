@@ -543,11 +543,6 @@ async def auto_surge_loop(app):
 # ==========================================
 # 7. 봇 실행
 # ==========================================
-if __name__ == "__main__":
-    print("텔레그램 봇 시작!")
-    print("입력 방법: AAPL / AAPL 단타 / AAPL 스윙")
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 async def main():
     print("텔레그램 봇 시작!")
 
@@ -557,15 +552,9 @@ async def main():
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
     )
 
-    await app.initialize()
-    await app.start()
-
-    # 🔥 자동 급등 탐지 시작
+    # 🔥 급등 탐지 백그라운드 실행
     asyncio.create_task(auto_surge_loop(app))
 
-    await app.updater.start_polling()
-    await asyncio.Event().wait()
-
-
+    await app.run_polling()
 if __name__ == "__main__":
     asyncio.run(main())
