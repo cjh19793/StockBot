@@ -476,6 +476,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(report, parse_mode='Markdown')
     await update.message.reply_photo(
         photo=chart_buf,
+        read_timeout=60,
+        write_timeout=60,
+        connect_timeout=60,
+        pool_timeout=60,
         caption=f"{ticker} {cfg['label']} 차트"
     )
 # ==========================================
@@ -484,7 +488,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def get_nasdaq_tickers():
     url = "https://raw.githubusercontent.com/datasets/nasdaq-listings/master/data/nasdaq-listed-symbols.csv"
     df = pd.read_csv(url)
-    return df["Symbol"].tolist()[:200]
+
+    tickers = df["Symbol"].dropna()
+
+    # 🔥 이상 티커 제거
+    tickers = [
+        t for t in tickers
+        if t.isalpha() and len(t) <= 5
+    ]
+
+    return tickers[:200]
 def find_surge_stocks():
 
     tickers = get_nasdaq_tickers()
@@ -540,6 +553,9 @@ async def auto_surge_loop(app):
                 )
 
         await asyncio.sleep(600)  # 10분마다
+async def error_handler(update, context):
+    print("에러 발생:", context.error)
+
 # ==========================================
 # 7. 봇 실행
 # ==========================================
@@ -551,6 +567,7 @@ def main():
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
     )
+    app.add_error_handler(error_handler)
 
     # 🔥 봇 시작 후 자동 실행될 작업 등록
     async def start_background(app):
