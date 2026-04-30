@@ -9,6 +9,11 @@ import io
 import os
 import datetime
 import pytz
+#--------------#
+import asyncio
+import requests
+#--------------#
+
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
@@ -26,6 +31,19 @@ plt.rcParams['axes.unicode_minus'] = False
 # 1. 설정
 # ==========================================
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
+CHAT_ID_FILE = "chat_id.txt"
+
+
+def save_chat_id(chat_id):
+    with open(CHAT_ID_FILE, "w") as f:
+        f.write(str(chat_id))
+
+
+def load_chat_id():
+    if os.path.exists(CHAT_ID_FILE):
+        with open(CHAT_ID_FILE) as f:
+            return f.read().strip()
+    return None
 
 MODE_CONFIG = {
     '단타': {
@@ -100,7 +118,7 @@ def calc_indicators(df):
     return df
 
 # ==========================================
-# 4. 매수/매도 신호 감지
+# 4. 매수/매도 신호 
 # ==========================================
 def detect_signal(df):
     buy_signals, sell_signals = [], []
@@ -416,9 +434,15 @@ def analyze(ticker, mode='기본'):
 # 6. 텔레그램 봇 핸들러
 # ==========================================
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ==========================================#
+    chat_id = update.message.chat.id
+    save_chat_id(chat_id)
+# ==========================================#
     text   = update.message.text.strip().upper()
     parts  = text.split()
     ticker = parts[0]
+
+    
 
     if len(parts) >= 2:
         mode_input = parts[1]
@@ -454,7 +478,68 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo=chart_buf,
         caption=f"{ticker} {cfg['label']} 차트"
     )
+# ==========================================
+# 나스닥 티커 가져오기
+# ==========================================
+def get_nasdaq_tickers():
+    url = "https://raw.githubusercontent.com/datasets/nasdaq-listings/master/data/nasdaq-listed-symbols.csv"
+    df = pd.read_csv(url)
+    return df["Symbol"].tolist()[:200]
+def find_surge_stocks():
 
+    tickers = get_nasdaq_tickers()
+    surged = []
+
+    for ticker in tickers:
+        try:
+            data = yf.download(
+                ticker,
+                period="2d",
+                interval="1d",
+                progress=False
+            )
+
+            if len(data) < 2:
+                continue
+
+            prev = data["Close"].iloc[-2]
+            curr = data["Close"].iloc[-1]
+
+            change = (curr - prev) / prev * 100
+
+            if change >= 5:
+                surged.append(f"{ticker} 🚀 {change:.2f}%")
+
+        except:
+            continue
+
+    return surged
+
+async def auto_surge_loop(app):
+
+    await asyncio.sleep(10)
+
+    while True:
+
+        chat_id = load_chat_id()
+
+        if chat_id:
+
+            print("급등주 스캔 시작")
+
+            surged = find_surge_stocks()
+
+            if surged:
+
+                msg = "🔥 나스닥 급등 종목 🔥\n\n"
+                msg += "\n".join(surged[:10])
+
+                await app.bot.send_message(
+                    chat_id=chat_id,
+                    text=msg
+                )
+
+        await asyncio.sleep(600)  # 10분마다
 # ==========================================
 # 7. 봇 실행
 # ==========================================
@@ -463,4 +548,24 @@ if __name__ == "__main__":
     print("입력 방법: AAPL / AAPL 단타 / AAPL 스윙")
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.run_polling()
+async def main():
+    print("텔레그램 봇 시작!")
+
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
+    )
+
+    await app.initialize()
+    await app.start()
+
+    # 🔥 자동 급등 탐지 시작
+    asyncio.create_task(auto_surge_loop(app))
+
+    await app.updater.start_polling()
+    await asyncio.Event().wait()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
