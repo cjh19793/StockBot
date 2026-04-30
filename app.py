@@ -543,7 +543,7 @@ async def auto_surge_loop(app):
 # ==========================================
 # 7. 봇 실행
 # ==========================================
-async def main():
+def main():
     print("텔레그램 봇 시작!")
 
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
@@ -552,9 +552,14 @@ async def main():
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
     )
 
-    # 🔥 급등 탐지 백그라운드 실행
-    asyncio.create_task(auto_surge_loop(app))
+    # 🔥 봇 시작 후 자동 실행될 작업 등록
+    async def start_background(app):
+        asyncio.create_task(auto_surge_loop(app))
 
-    await app.run_polling()
+    app.post_init = start_background
+
+    app.run_polling()
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
