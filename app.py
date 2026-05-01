@@ -508,7 +508,6 @@ def get_nasdaq_tickers():
 
     return tickers[:30]
 def find_surge_stocks():
-
     tickers = get_nasdaq_tickers()
     surged = []
 
@@ -521,18 +520,25 @@ def find_surge_stocks():
                 progress=False
             )
 
+            # ✅ MultiIndex 처리 추가
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = data.columns.droplevel(1)
+
             if len(data) < 2:
                 continue
 
-            prev = data["Close"].iloc[-2]
-            curr = data["Close"].iloc[-1]
-
+            # ✅ float 변환 추가
+            prev   = float(data["Close"].iloc[-2])
+            curr   = float(data["Close"].iloc[-1])
             change = (curr - prev) / prev * 100
 
-            if change >= 5:
-                surged.append(f"{ticker} 🚀 {change:.2f}%")
+            print(f"{ticker}: {change:.2f}%")  # 확인용 로그
 
-        except:
+            if change >= 1:
+                surged.append(f"{ticker} +{change:.2f}%")
+
+        except Exception as e:
+            print(f"{ticker} 오류: {e}")
             continue
 
     return surged
