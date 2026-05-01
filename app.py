@@ -319,41 +319,41 @@ def analyze(ticker, mode='기본'):
         f"{action_guide}"
     )
 
-    # ── 차트 생성 ───────────────────────────────────────
+        # ── 차트 생성 ───────────────────────────────────────
     fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(14, 18), sharex=True)
 
-    # (1) 주가 + 볼린저밴드 + 이동평균선
+    # (1) Price + Bollinger Band + MA
     ax1.plot(df.index, df['Close'], color='black', label='Price', linewidth=1.5, zorder=3)
     ax1.plot(df.index, df['MA5'],   color='orange', label='MA5',  linewidth=1.0, linestyle='--')
     ax1.plot(df.index, df['MA20'],  color='blue',   label='MA20', linewidth=1.0, linestyle='--')
-    ax1.plot(df.index, df['Upper'], color='red',  alpha=0.4, label='BB 상단', linewidth=1)
-    ax1.plot(df.index, df['Lower'], color='blue', alpha=0.4, label='BB 하단', linewidth=1)
+    ax1.plot(df.index, df['Upper'], color='red',  alpha=0.4, label='BB Upper', linewidth=1)
+    ax1.plot(df.index, df['Lower'], color='blue', alpha=0.4, label='BB Lower', linewidth=1)
     ax1.fill_between(df.index,
                      df['Lower'].values.flatten(),
                      df['Upper'].values.flatten(),
                      color='gray', alpha=0.1)
 
-    # 목표가 / 손절가 수평선
-    ax1.axhline(target_price, color='green', linestyle='--', alpha=0.6, linewidth=1.2, label=f'목표가 {target_price:.2f}')
-    ax1.axhline(stop_loss,    color='red',   linestyle='--', alpha=0.6, linewidth=1.2, label=f'손절가 {stop_loss:.2f}')
+    # Target / Stop Loss
+    ax1.axhline(target_price, color='green', linestyle='--', alpha=0.6, linewidth=1.2, label=f'Target {target_price:.2f}')
+    ax1.axhline(stop_loss,    color='red',   linestyle='--', alpha=0.6, linewidth=1.2, label=f'Stop {stop_loss:.2f}')
 
-    # 최고가 / 최저가 마커
+    # High / Low marker
     high_idx = df['High'].idxmax()
     low_idx  = df['Low'].idxmin()
     high_val = float(df['High'].max())
     low_val  = float(df['Low'].min())
 
-    ax1.scatter(high_idx, high_val, color='red', marker='*', s=250, zorder=5, label=f'최고가 {high_val:.2f}')
+    ax1.scatter(high_idx, high_val, color='red', marker='*', s=250, zorder=5, label=f'High {high_val:.2f}')
     ax1.annotate(
-        f'최고 {high_val:.2f}',
+        f'High {high_val:.2f}',
         xy=(high_idx, high_val),
         xytext=(0, 14), textcoords='offset points',
         ha='center', fontsize=9, fontweight='bold', color='red',
         bbox=dict(boxstyle='round,pad=0.3', facecolor='#ffebee', edgecolor='red', alpha=0.9)
     )
-    ax1.scatter(low_idx, low_val, color='blue', marker='*', s=250, zorder=5, label=f'최저가 {low_val:.2f}')
+    ax1.scatter(low_idx, low_val, color='blue', marker='*', s=250, zorder=5, label=f'Low {low_val:.2f}')
     ax1.annotate(
-        f'최저 {low_val:.2f}',
+        f'Low {low_val:.2f}',
         xy=(low_idx, low_val),
         xytext=(0, -20), textcoords='offset points',
         ha='center', fontsize=9, fontweight='bold', color='blue',
@@ -369,20 +369,20 @@ def analyze(ticker, mode='기본'):
     ax1.legend(loc='upper left', fontsize=7, ncol=3)
     ax1.grid(True, alpha=0.2)
 
-    # (2) 거래량
+    # (2) Volume
     bar_colors = np.where(df['Close'] >= df['Open'], 'red', 'blue').flatten()
     ax2.bar(df.index, df['Volume'].values.flatten(), color=bar_colors, alpha=0.7, width=bar_width)
     ax2.plot(df.index, df['Volume'].rolling(20).mean(),
-             color='orange', linewidth=1.2, linestyle='--', label='거래량 20MA')
+             color='orange', linewidth=1.2, linestyle='--', label='Volume 20MA')
     ax2.set_ylabel('Volume')
     ax2.legend(loc='upper left', fontsize=8)
     ax2.grid(True, alpha=0.2)
 
     # (3) RSI
     ax3.plot(df.index, df['RSI'], color='purple', label='RSI (14)', linewidth=1.5)
-    ax3.axhline(70, color='red',  linestyle='--', alpha=0.5, label='과매수(70) - 매도 고려')
+    ax3.axhline(70, color='red',  linestyle='--', alpha=0.5, label='Overbought(70) - Sell')
     ax3.axhline(50, color='gray', linestyle=':',  alpha=0.4)
-    ax3.axhline(30, color='blue', linestyle='--', alpha=0.5, label='과매도(30) - 매수 고려')
+    ax3.axhline(30, color='blue', linestyle='--', alpha=0.5, label='Oversold(30) - Buy')
     ax3.fill_between(df.index, 70, 100, where=(df['RSI'] >= 70), color='red',  alpha=0.15)
     ax3.fill_between(df.index,  0,  30, where=(df['RSI'] <= 30), color='blue', alpha=0.15)
     ax3.scatter(df.index[-1], rsi, color='purple', zorder=5, s=80)
@@ -395,7 +395,7 @@ def analyze(ticker, mode='기본'):
 
     # (4) MACD
     ax4.plot(df.index, df['MACD'],        color='blue',   label='MACD',   linewidth=1.2)
-    ax4.plot(df.index, df['MACD_signal'], color='orange', label='Signal (골든크로스->매수 / 데드크로스->매도)', linewidth=1.2)
+    ax4.plot(df.index, df['MACD_signal'], color='orange', label='Signal (Golden->Buy / Dead->Sell)', linewidth=1.2)
     hist_colors = np.where(df['MACD_hist'] >= 0, 'red', 'blue').flatten()
     ax4.bar(df.index, df['MACD_hist'].values.flatten(),
             color=hist_colors, alpha=0.4, width=bar_width, label='Histogram')
@@ -404,11 +404,11 @@ def analyze(ticker, mode='기본'):
     ax4.legend(loc='upper left', fontsize=8)
     ax4.grid(True, alpha=0.2)
 
-    # (5) 스토캐스틱
+    # (5) Stochastic
     ax5.plot(df.index, df['Stoch_K'], color='green', label='%K', linewidth=1.2)
     ax5.plot(df.index, df['Stoch_D'], color='red',   label='%D', linewidth=1.2)
-    ax5.axhline(80, color='red',  linestyle='--', alpha=0.5, label='과매수(80) - 매도 고려')
-    ax5.axhline(20, color='blue', linestyle='--', alpha=0.5, label='과매도(20) - 매수 고려')
+    ax5.axhline(80, color='red',  linestyle='--', alpha=0.5, label='Overbought(80) - Sell')
+    ax5.axhline(20, color='blue', linestyle='--', alpha=0.5, label='Oversold(20) - Buy')
     ax5.fill_between(df.index, 80, 100, where=(df['Stoch_K'] >= 80), color='red',  alpha=0.15)
     ax5.fill_between(df.index,  0,  20, where=(df['Stoch_K'] <= 20), color='blue', alpha=0.15)
     ax5.set_ylim(0, 100)
