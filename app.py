@@ -479,89 +479,159 @@ def get_nasdaq_tickers():
     random.shuffle(tickers)
     return tickers[:200]
 
+# ==========================================
+# 세력 개입 감지
+# ==========================================
+def detect_smart_money(df):
+    score = 0
+    signals = []
+
+    try:
+        avg_vol   = float(df['Volume'].rolling(20).mean().iloc[-1])
+        curr_vol  = float(df['Volume'].iloc[-1])
+        vol_ratio = curr_vol / avg_vol if avg_vol > 0 else 0
+
+        curr_close = float(df['Close'].iloc[-1])
+        prev_close = float(df['Close'].iloc[-2])
+        price_change = (curr_close - prev_close) / prev_close * 100
+
+        # 거래량 5배 이상
+        if vol_ratio >= 5:
+            score += 3
+            signals.append(f"거래량 {vol_ratio:.1f}배 - 세력 개입 강한 의심")
+        elif vol_ratio >= 3:
+            score += 2
+            signals.append(f"거래량 {vol_ratio:.1f}배 - 세력 개입 의심")
+
+        # 20일 고점 돌파
+        recent_high = float(df['Close'].rolling(20).max().iloc[-2])
+        if curr_close > recent_high:
+            score += 2
+            signals.append("20일 고점 돌파 - 상승 돌파 신호")
+
+        # 거래량 많은데 가격 상승 적음 (매집 의심)
+        if vol_ratio >= 3 and price_change < 2:
+            score += 3
+            signals.append("거래량 대비 가격 낮음 - 매집 의심")
+
+        # 3연속 양봉
+        if len(df) >= 3:
+            last3 = df['Close'].iloc[-3:].values.flatten()
+            if last3[0] < last3[1] < last3[2]:
+                score += 1
+                signals.append("3연속 양봉 - 매수세 지속")
+
+        # 장 시작/마감 시간대 (세력 주요 활동 시간)
+        et      = datetime.datetime.now(pytz.timezone('America/New_York'))
+        et_hour = et.hour + et.minute / 60
+        if 9.5 <= et_hour <= 10.0 or 15.5 <= et_hour <= 16.0:
+            score += 1
+            signals.append("세력 주요 활동 시간대")
+
+    except Exception as e:
+        print(f"세력 감지 오류: {e}")
+
+    return score, signals
+
+
+# ==========================================
+# 급등주 스캔 (토스보다 빠르게)
+# ==========================================
 def find_surge_stocks():
     tickers = get_nasdaq_tickers()
-    surged = []
+    surged  = []
 
     for ticker in tickers:
         try:
-            data = yf.download(
+            # 5분봉 당일 데이터
+            data_5m = yf.download(
                 ticker,
-                period="1d",
+                period="5d",
                 interval="5m",
                 progress=False
             )
-
-            if isinstance(data.columns, pd.MultiIndex):
-                data.columns = data.columns.droplevel(1)
-
-            if len(data) < 2:
+            if isinstance(data_5m.columns, pd.MultiIndex):
+                data_5m.columns = data_5m.columns.droplevel(1)
+            if len(data_5m) < 20:
                 continue
 
-            prev   = float(data["Close"].iloc[0])
-            curr   = float(data["Close"].iloc[-1])
-            change = (curr - prev) / prev * 100
+            # 당일 변동률
+            today_start = float(data_5m['Close'].iloc[0])
+            curr_price  = float(data_5m['Close'].iloc[-1])
+            change      = (curr_price - today_start) / today_start * 100
+
+            # ✅ 기준 낮춰서 더 빨리 포착 (2% 이상)
+            if change < 2:
+                continue
 
             print(f"{ticker}: {change:.2f}%")
 
-            if change >= 5:
-                # ✅ 단타 점수 (5분봉 5일)
-                try:
-                    data_5m = yf.download(ticker, period="5d", interval="5m", progress=False)
-                    if isinstance(data_5m.columns, pd.MultiIndex):
-                        data_5m.columns = data_5m.columns.droplevel(1)
-                    if not data_5m.empty:
-                        data_5m = calc_indicators(data_5m)
-                        buy_5m, _, sell_5m, _ = detect_signal(data_5m)
-                    else:
-                        buy_5m, sell_5m = 0, 0
-                except:
-                    buy_5m, sell_5m = 0, 0
+            # 단타 점수 (5분봉)
+            try:
+                data_5m_ind = calc_indicators(data_5m.copy())
+                buy_5m, _, sell_5m, _ = detect_signal(data_5m_ind)
+            except:
+                buy_5m, sell_5m = 0, 0
 
-                # ✅ 기본 점수 (일봉 6개월)
-                try:
-                    data_1d = yf.download(ticker, period="6mo", interval="1d", progress=False)
-                    if isinstance(data_1d.columns, pd.MultiIndex):
-                        data_1d.columns = data_1d.columns.droplevel(1)
-                    if not data_1d.empty:
-                        data_1d = calc_indicators(data_1d)
-                        buy_1d, _, sell_1d, _ = detect_signal(data_1d)
-                    else:
-                        buy_1d, sell_1d = 0, 0
-                except:
+            # 기본 점수 (일봉)
+            try:
+                data_1d = yf.download(ticker, period="6mo", interval="1d", progress=False)
+                if isinstance(data_1d.columns, pd.MultiIndex):
+                    data_1d.columns = data_1d.columns.droplevel(1)
+                if not data_1d.empty:
+                    data_1d_ind = calc_indicators(data_1d.copy())
+                    buy_1d, _, sell_1d, _ = detect_signal(data_1d_ind)
+                else:
                     buy_1d, sell_1d = 0, 0
+            except:
+                buy_1d, sell_1d = 0, 0
 
-                surged.append((ticker, change, buy_5m, sell_5m, buy_1d, sell_1d))
+            # 세력 개입 점수
+            try:
+                smart_score, smart_signals = detect_smart_money(data_5m)
+            except:
+                smart_score, smart_signals = 0, []
+
+            # 총합 점수
+            total_score = buy_5m + buy_1d + smart_score
+
+            surged.append((
+                ticker, change, curr_price,
+                buy_5m, sell_5m,
+                buy_1d, sell_1d,
+                smart_score, smart_signals,
+                total_score
+            ))
 
         except Exception as e:
             print(f"{ticker} 오류: {e}")
             continue
 
-    surged.sort(key=lambda x: x[1], reverse=True)
+    # ✅ 총합 점수 기준 내림차순 정렬
+    surged.sort(key=lambda x: x[9], reverse=True)
 
     result = []
-    for ticker, change, buy_5m, sell_5m, buy_1d, sell_1d in surged:
-        # 단타 판정
-        if buy_5m > sell_5m:
-            judge_5m = f"매수 {buy_5m}점"
-        elif sell_5m > buy_5m:
-            judge_5m = f"매도 {sell_5m}점"
-        else:
-            judge_5m = "중립"
-        # 기본 판정
-        if buy_1d > sell_1d:
-            judge_1d = f"매수 {buy_1d}점"
-        elif sell_1d > buy_1d:
-            judge_1d = f"매도 {sell_1d}점"
-        else:
-            judge_1d = "중립"
+    for i, (ticker, change, curr_price,
+         buy_5m, sell_5m,
+         buy_1d, sell_1d,
+         smart_score, smart_signals,
+         total_score) in enumerate(surged[:10], 1):
+
+        # 종합 판정
+        if total_score >= 8:   overall = "강력 매수"
+        elif total_score >= 5: overall = "매수 고려"
+        elif total_score >= 3: overall = "관망"
+        else:                  overall = "주의"
+
         result.append(
-            f"{ticker} +{change:.2f}%\n"
-            f"  단타(5분봉): {judge_5m} (매수:{buy_5m} 매도:{sell_5m})\n"
-            f"  기본(일봉):  {judge_1d} (매수:{buy_1d} 매도:{sell_1d})"
+            f"{i}. {ticker} +{change:.2f}% | 총점:{total_score} | {overall}"
         )
+
     return result
-    
+
+# ==========================================
+# 자동 스캔 루프 (3분마다)
+# ==========================================
 async def auto_surge_loop(app):
     await asyncio.sleep(10)
 
@@ -569,7 +639,6 @@ async def auto_surge_loop(app):
         chat_id = os.environ.get('CHAT_ID')
         print(f"스캔 실행 중 - chat_id: {chat_id}")
 
-        # ✅ 미국 장중 시간 체크
         et      = datetime.datetime.now(pytz.timezone('America/New_York'))
         et_hour = et.hour + et.minute / 60
 
@@ -577,77 +646,39 @@ async def auto_surge_loop(app):
             print("장중 - 급등주 스캔 시작")
 
             if chat_id:
-                surged = find_surge_stocks()
-                print(f"급등 종목 수: {len(surged)}")
+                    surged = find_surge_stocks()
+                    print(f"감지 종목 수: {len(surged)}")
 
-                if surged:
-                    msg = "나스닥 급등 종목 (장 시작가 대비)\n\n"
-                    msg += "\n".join(surged[:10])
+                    if surged:
+                        msg = "나스닥 선제 급등 감지\n\n"
+                        msg += "\n".join(surged)
 
-                    try:
-                        await app.bot.send_message(
-                            chat_id=int(chat_id),
-                            text=msg
-                        )
-                        print("텔레그램 전송 완료")
-                    except Exception as e:
-                        print(f"전송 오류: {e}")
+                        try:
+                            await app.bot.send_message(
+                                chat_id=int(chat_id),
+                                text=msg
+                            )
+                            print("텔레그램 전송 완료")
+                        except Exception as e:
+                            print(f"전송 오류: {e}")
+
+                    if msg:
+                        try:
+                            await app.bot.send_message(
+                                chat_id=int(chat_id),
+                                text=msg
+                            )
+                            print("텔레그램 전송 완료")
+                        except Exception as e:
+                            print(f"전송 오류: {e}")
             else:
                 print("chat_id 없음 - 스킵")
 
         else:
-            # ✅ 장 마감 중엔 일봉 기준으로 전환
-            print("장 마감 중 - 일봉 기준 스캔")
+            print("장 마감 중 - 스캔 스킵")
 
-            if chat_id:
-                # 일봉 기준 급등 스캔
-                tickers = get_nasdaq_tickers()
-                surged  = []
-
-                for ticker in tickers:
-                    try:
-                        data = yf.download(
-                            ticker,
-                            period="2d",
-                            interval="1d",
-                            progress=False
-                        )
-
-                        if isinstance(data.columns, pd.MultiIndex):
-                            data.columns = data.columns.droplevel(1)
-
-                        if len(data) < 2:
-                            continue
-
-                        prev   = float(data["Close"].iloc[-2])
-                        curr   = float(data["Close"].iloc[-1])
-                        change = (curr - prev) / prev * 100
-
-                        if change >= 5:
-                            surged.append((ticker, change))
-
-                    except:
-                        continue
-
-                surged.sort(key=lambda x: x[1], reverse=True)
-                surged = [f"{ticker} +{change:.2f}%" for ticker, change in surged]
-
-                print(f"급등 종목 수: {len(surged)}")
-
-                if surged:
-                    msg = "나스닥 급등 종목 (전일 대비)\n\n"
-                    msg += "\n".join(surged[:10])
-
-                    try:
-                        await app.bot.send_message(
-                            chat_id=int(chat_id),
-                            text=msg
-                        )
-                        print("텔레그램 전송 완료")
-                    except Exception as e:
-                        print(f"전송 오류: {e}")
-
-        await asyncio.sleep(600)  # 10분마다
+        # ✅ 3분마다 스캔 (토스보다 빠르게)
+        await asyncio.sleep(180)
 
 async def error_handler(update, context):
     print(f"에러 발생: {context.error}")
