@@ -511,10 +511,11 @@ def find_surge_stocks():
 
     for ticker in tickers:
         try:
+            # ✅ 5분봉으로 당일 데이터 가져오기
             data = yf.download(
                 ticker,
-                period="2d",
-                interval="1d",
+                period="1d",
+                interval="5m",
                 progress=False
             )
 
@@ -524,24 +525,21 @@ def find_surge_stocks():
             if len(data) < 2:
                 continue
 
-            prev   = float(data["Close"].iloc[-2])
-            curr   = float(data["Close"].iloc[-1])
+            prev   = float(data["Close"].iloc[0])   # 장 시작가
+            curr   = float(data["Close"].iloc[-1])  # 현재가
             change = (curr - prev) / prev * 100
 
             print(f"{ticker}: {change:.2f}%")
 
             if change >= 5:
-                # ✅ 텍스트 대신 튜플로 저장
                 surged.append((ticker, change))
 
         except Exception as e:
             print(f"{ticker} 오류: {e}")
             continue
 
-    # ✅ 변동률 기준 내림차순 정렬
+    # 내림차순 정렬
     surged.sort(key=lambda x: x[1], reverse=True)
-
-    # ✅ 텍스트로 변환
     return [f"{ticker} +{change:.2f}%" for ticker, change in surged]
 
 
@@ -549,35 +547,89 @@ async def auto_surge_loop(app):
     await asyncio.sleep(10)
 
     while True:
-        # ✅ 환경변수에서 직접 가져오기
         chat_id = os.environ.get('CHAT_ID')
         print(f"스캔 실행 중 - chat_id: {chat_id}")
 
-        if chat_id:
-            print("급등주 스캔 시작")
-            surged = find_surge_stocks()
-            print(f"급등 종목 수: {len(surged)}")
+        # ✅ 미국 장중 시간 체크
+        et      = datetime.datetime.now(pytz.timezone('America/New_York'))
+        et_hour = et.hour + et.minute / 60
 
-            if surged:
-                msg = "나스닥 급등 종목\n\n"
-                msg += "\n".join(surged[:10])
+        if et.weekday() < 5 and 9.5 <= et_hour < 16:
+            print("장중 - 급등주 스캔 시작")
 
-                # ✅ 오류 처리 추가
-                try:
-                    await app.bot.send_message(
-                        chat_id=int(chat_id),  # ✅ int 변환 추가
-                        text=msg
-                    )
-                    print("텔레그램 전송 완료")
-                except Exception as e:
-                    print(f"전송 오류: {e}")
+            if chat_id:
+                surged = find_surge_stocks()
+                print(f"급등 종목 수: {len(surged)}")
+
+                if surged:
+                    msg = "나스닥 급등 종목 (장 시작가 대비)\n\n"
+                    msg += "\n".join(surged[:10])
+
+                    try:
+                        await app.bot.send_message(
+                            chat_id=int(chat_id),
+                            text=msg
+                        )
+                        print("텔레그램 전송 완료")
+                    except Exception as e:
+                        print(f"전송 오류: {e}")
+            else:
+                print("chat_id 없음 - 스킵")
+
         else:
-            print("chat_id 없음 - 스킵")
+            # ✅ 장 마감 중엔 일봉 기준으로 전환
+            print("장 마감 중 - 일봉 기준 스캔")
 
-        await asyncio.sleep(600)
-  # 10분마다
-async def error_handler(update, context):
-    print("에러 발생:", context.error)
+            if chat_id:
+                # 일봉 기준 급등 스캔
+                tickers = get_nasdaq_tickers()
+                surged  = []
+
+                for ticker in tickers:
+                    try:
+                        data = yf.download(
+                            ticker,
+                            period="2d",
+                            interval="1d",
+                            progress=False
+                        )
+
+                        if isinstance(data.columns, pd.MultiIndex):
+                            data.columns = data.columns.droplevel(1)
+
+                        if len(data) < 2:
+                            continue
+
+                        prev   = float(data["Close"].iloc[-2])
+                        curr   = float(data["Close"].iloc[-1])
+                        change = (curr - prev) / prev * 100
+
+                        if change >= 5:
+                            surged.append((ticker, change))
+
+                    except:
+                        continue
+
+                surged.sort(key=lambda x: x[1], reverse=True)
+                surged = [f"{ticker} +{change:.2f}%" for ticker, change in surged]
+
+                print(f"급등 종목 수: {len(surged)}")
+
+                if surged:
+                    msg = "나스닥 급등 종목 (전일 대비)\n\n"
+                    msg += "\n".join(surged[:10])
+
+                    try:
+                        await app.bot.send_message(
+                            chat_id=int(chat_id),
+                            text=msg
+                        )
+                        print("텔레그램 전송 완료")
+                    except Exception as e:
+                        print(f"전송 오류: {e}")
+
+        await asyncio.sleep(600)  # 10분마다
+
 
 # ==========================================
 # 7. 봇 실행
