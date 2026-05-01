@@ -520,28 +520,32 @@ def find_surge_stocks():
                 progress=False
             )
 
-            # ✅ MultiIndex 처리 추가
             if isinstance(data.columns, pd.MultiIndex):
                 data.columns = data.columns.droplevel(1)
 
             if len(data) < 2:
                 continue
 
-            # ✅ float 변환 추가
             prev   = float(data["Close"].iloc[-2])
             curr   = float(data["Close"].iloc[-1])
             change = (curr - prev) / prev * 100
 
-            print(f"{ticker}: {change:.2f}%")  # 확인용 로그
+            print(f"{ticker}: {change:.2f}%")
 
-            if change >= 1:
-                surged.append(f"{ticker} +{change:.2f}%")
+            if change >= 5:
+                # ✅ 텍스트 대신 튜플로 저장
+                surged.append((ticker, change))
 
         except Exception as e:
             print(f"{ticker} 오류: {e}")
             continue
 
-    return surged
+    # ✅ 변동률 기준 내림차순 정렬
+    surged.sort(key=lambda x: x[1], reverse=True)
+
+    # ✅ 텍스트로 변환
+    return [f"{ticker} +{change:.2f}%" for ticker, change in surged]
+
 
 async def auto_surge_loop(app):
 
