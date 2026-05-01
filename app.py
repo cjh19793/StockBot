@@ -544,6 +544,7 @@ async def auto_surge_loop(app):
     while True:
 
         chat_id = os.environ.get('CHAT_ID')
+        print(f"스캔 실행 중 - chat_id: {chat_id}")
 
         if chat_id:
 
