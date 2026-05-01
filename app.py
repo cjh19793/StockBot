@@ -9,16 +9,11 @@ import io
 import os
 import datetime
 import pytz
-#--------------#
 import asyncio
 import requests
-#--------------#
-
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
-
-
 
 plt.rcParams['axes.unicode_minus'] = False
 
@@ -28,11 +23,9 @@ plt.rcParams['axes.unicode_minus'] = False
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID_FILE = "chat_id.txt"
 
-
 def save_chat_id(chat_id):
     with open(CHAT_ID_FILE, "w") as f:
         f.write(str(chat_id))
-
 
 def load_chat_id():
     if os.path.exists(CHAT_ID_FILE):
@@ -60,7 +53,6 @@ MODE_CONFIG = {
         'bar_width': 0.6,
     },
 }
-
 # ==========================================
 # 2. yfinance 데이터 가져오기
 # ==========================================
@@ -78,7 +70,6 @@ def get_df(ticker, mode='기본'):
     except Exception as e:
         print(f"yfinance 오류: {e}")
         return None
-
 # ==========================================
 # 3. 지표 계산
 # ==========================================
@@ -111,7 +102,6 @@ def calc_indicators(df):
     df['MA60'] = df['Close'].rolling(window=60).mean()
 
     return df
-
 # ==========================================
 # 4. 매수/매도 신호 
 # ==========================================
@@ -140,7 +130,7 @@ def detect_signal(df):
 
     prev_ma5  = get_value(df['MA5'].iloc[:-1])
     prev_ma20 = get_value(df['MA20'].iloc[:-1])
-
+    
     # ── 매수 조건 ──────────────────────────────────────
     if curr_rsi <= 30:
         buy_signals.append(f"RSI 과매도 ({curr_rsi:.1f}) - 너무 많이 떨어져서 반등 가능성 높음")
@@ -216,7 +206,6 @@ def detect_signal(df):
 
     return buy_score, buy_signals, sell_score, sell_signals
 
-
 def final_judgment(buy_score, sell_score):
     if buy_score == 0 and sell_score == 0:
         return "[중립] 관망", "gray", "중립 - 관망"
@@ -233,7 +222,6 @@ def final_judgment(buy_score, sell_score):
         else:                 label = "약한 매도"
         return f"[매도] {label}", "red", f"[매도] {label}"
     return "[중립] 균형 - 관망", "gray", "균형 - 관망"
-
 # ==========================================
 # 5. 분석 + 차트 생성
 # ==========================================
