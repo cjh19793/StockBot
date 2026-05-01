@@ -623,6 +623,10 @@ def find_surge_stocks():
         elif total_score >= 3: overall = "관망"
         else:                  overall = "주의"
 
+        if smart_score >= 5:   smart_label = "[세력 강한 의심]"
+        elif smart_score >= 3: smart_label = "[세력 의심]"
+        else:                  smart_label = ""
+            
         result.append(
             f"{i}. {ticker} +{change:.2f}% | 총점:{total_score} | {overall}"
         )
@@ -652,17 +656,6 @@ async def auto_surge_loop(app):
                     if surged:
                         msg = "나스닥 선제 급등 감지\n\n"
                         msg += "\n".join(surged)
-
-                        try:
-                            await app.bot.send_message(
-                                chat_id=int(chat_id),
-                                text=msg
-                            )
-                            print("텔레그램 전송 완료")
-                        except Exception as e:
-                            print(f"전송 오류: {e}")
-
-                    if msg:
                         try:
                             await app.bot.send_message(
                                 chat_id=int(chat_id),
