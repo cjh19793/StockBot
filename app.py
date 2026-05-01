@@ -546,31 +546,36 @@ def find_surge_stocks():
 
 
 async def auto_surge_loop(app):
-
     await asyncio.sleep(10)
 
     while True:
-
+        # ✅ 환경변수에서 직접 가져오기
         chat_id = os.environ.get('CHAT_ID')
         print(f"스캔 실행 중 - chat_id: {chat_id}")
 
         if chat_id:
-
             print("급등주 스캔 시작")
-
             surged = find_surge_stocks()
             print(f"급등 종목 수: {len(surged)}")
-            if surged:
 
-                msg = "🔥 나스닥 급등 종목 🔥\n\n"
+            if surged:
+                msg = "나스닥 급등 종목\n\n"
                 msg += "\n".join(surged[:10])
 
-                await app.bot.send_message(
-                    chat_id=chat_id,
-                    text=msg
-                )
+                # ✅ 오류 처리 추가
+                try:
+                    await app.bot.send_message(
+                        chat_id=int(chat_id),  # ✅ int 변환 추가
+                        text=msg
+                    )
+                    print("텔레그램 전송 완료")
+                except Exception as e:
+                    print(f"전송 오류: {e}")
+        else:
+            print("chat_id 없음 - 스킵")
 
-        await asyncio.sleep(600)  # 10분마다
+        await asyncio.sleep(600)
+  # 10분마다
 async def error_handler(update, context):
     print("에러 발생:", context.error)
 
