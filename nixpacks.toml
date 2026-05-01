@@ -1,2 +1,2 @@
 [phases.setup]
-nixPkgs = ["nanum-gothic"]
+nixPkgs = ["nanum-fonts"]
