@@ -630,6 +630,9 @@ async def auto_surge_loop(app):
 
         await asyncio.sleep(600)  # 10분마다
 
+async def error_handler(update, context):
+    print(f"에러 발생: {context.error}")
+
 
 # ==========================================
 # 7. 봇 실행
