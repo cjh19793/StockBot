@@ -446,6 +446,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==========================================#
     chat_id = update.message.chat.id
     save_chat_id(chat_id)
+    print(f"chat_id 확인: {chat_id}")
 # ==========================================#
     text   = update.message.text.strip().upper()
     parts  = text.split()
