@@ -19,20 +19,6 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
 
-# ── 한글 폰트 설정 ──────────────────────────
-import matplotlib.font_manager as fm
-
-if platform.system() == 'Windows':
-    plt.rcParams['font.family'] = 'Malgun Gothic'
-elif platform.system() == 'Darwin':
-    plt.rcParams['font.family'] = 'AppleGothic'
-else:
-    # Railway 서버용 — 나눔고딕 없으면 영문 폰트 사용
-    try:
-        fm.findfont('NanumGothic', fallback_to_default=False)
-        plt.rcParams['font.family'] = 'NanumGothic'
-    except:
-        plt.rcParams['font.family'] = 'DejaVu Sans'
 
 plt.rcParams['axes.unicode_minus'] = False
 
