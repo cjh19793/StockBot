@@ -497,7 +497,6 @@ def find_surge_stocks():
 
     for ticker in tickers:
         try:
-            # ✅ 5분봉으로 당일 데이터 가져오기
             data = yf.download(
                 ticker,
                 period="1d",
@@ -511,24 +510,70 @@ def find_surge_stocks():
             if len(data) < 2:
                 continue
 
-            prev   = float(data["Close"].iloc[0])   # 장 시작가
-            curr   = float(data["Close"].iloc[-1])  # 현재가
+            prev   = float(data["Close"].iloc[0])
+            curr   = float(data["Close"].iloc[-1])
             change = (curr - prev) / prev * 100
 
             print(f"{ticker}: {change:.2f}%")
 
             if change >= 5:
-                surged.append((ticker, change))
+                # ✅ 단타 점수 (5분봉 5일)
+                try:
+                    data_5m = yf.download(ticker, period="5d", interval="5m", progress=False)
+                    if isinstance(data_5m.columns, pd.MultiIndex):
+                        data_5m.columns = data_5m.columns.droplevel(1)
+                    if not data_5m.empty:
+                        data_5m = calc_indicators(data_5m)
+                        buy_5m, _, sell_5m, _ = detect_signal(data_5m)
+                    else:
+                        buy_5m, sell_5m = 0, 0
+                except:
+                    buy_5m, sell_5m = 0, 0
+
+                # ✅ 기본 점수 (일봉 6개월)
+                try:
+                    data_1d = yf.download(ticker, period="6mo", interval="1d", progress=False)
+                    if isinstance(data_1d.columns, pd.MultiIndex):
+                        data_1d.columns = data_1d.columns.droplevel(1)
+                    if not data_1d.empty:
+                        data_1d = calc_indicators(data_1d)
+                        buy_1d, _, sell_1d, _ = detect_signal(data_1d)
+                    else:
+                        buy_1d, sell_1d = 0, 0
+                except:
+                    buy_1d, sell_1d = 0, 0
+
+                surged.append((ticker, change, buy_5m, sell_5m, buy_1d, sell_1d))
 
         except Exception as e:
             print(f"{ticker} 오류: {e}")
             continue
 
-    # 내림차순 정렬
     surged.sort(key=lambda x: x[1], reverse=True)
-    return [f"{ticker} +{change:.2f}%" for ticker, change in surged]
 
-
+    result = []
+    for ticker, change, buy_5m, sell_5m, buy_1d, sell_1d in surged:
+        # 단타 판정
+        if buy_5m > sell_5m:
+            judge_5m = f"매수 {buy_5m}점"
+        elif sell_5m > buy_5m:
+            judge_5m = f"매도 {sell_5m}점"
+        else:
+            judge_5m = "중립"
+        # 기본 판정
+        if buy_1d > sell_1d:
+            judge_1d = f"매수 {buy_1d}점"
+        elif sell_1d > buy_1d:
+            judge_1d = f"매도 {sell_1d}점"
+        else:
+            judge_1d = "중립"
+        result.append(
+            f"{ticker} +{change:.2f}%\n"
+            f"  단타(5분봉): {judge_5m} (매수:{buy_5m} 매도:{sell_5m})\n"
+            f"  기본(일봉):  {judge_1d} (매수:{buy_1d} 매도:{sell_1d})"
+        )
+    return result
+    
 async def auto_surge_loop(app):
     await asyncio.sleep(10)
 
