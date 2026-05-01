@@ -497,16 +497,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def get_nasdaq_tickers():
     url = "https://raw.githubusercontent.com/datasets/nasdaq-listings/master/data/nasdaq-listed-symbols.csv"
     df = pd.read_csv(url)
-
     tickers = df["Symbol"].dropna()
+    tickers = [t for t in tickers if t.isalpha() and len(t) <= 5]
 
-    # 🔥 이상 티커 제거
-    tickers = [
-        t for t in tickers
-        if t.isalpha() and len(t) <= 5
-    ]
+    # ✅ 매번 랜덤으로 200 뽑기
+    import random
+    random.shuffle(tickers)
+    return tickers[:200]
 
-    return tickers[:30]
 def find_surge_stocks():
     tickers = get_nasdaq_tickers()
     surged = []
