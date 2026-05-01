@@ -497,7 +497,7 @@ def get_nasdaq_tickers():
         if t.isalpha() and len(t) <= 5
     ]
 
-    return tickers[:200]
+    return tickers[:30]
 def find_surge_stocks():
 
     tickers = get_nasdaq_tickers()
@@ -559,7 +559,7 @@ async def error_handler(update, context):
 # ==========================================
 # 7. 봇 실행
 # ==========================================
-def main():
+async def main():
     print("텔레그램 봇 시작!")
 
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
@@ -567,16 +567,14 @@ def main():
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
     )
+
     app.add_error_handler(error_handler)
 
-    # 🔥 봇 시작 후 자동 실행될 작업 등록
-    async def start_background(app):
-        asyncio.create_task(auto_surge_loop(app))
+    # ✅ 급등주 루프 실행
+    asyncio.create_task(auto_surge_loop(app))
 
-    app.post_init = start_background
-
-    app.run_polling()
+    await app.run_polling()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
