@@ -550,7 +550,7 @@ async def auto_surge_loop(app):
             print("급등주 스캔 시작")
 
             surged = find_surge_stocks()
-
+            print(f"급등 종목 수: {len(surged)}")
             if surged:
 
                 msg = "🔥 나스닥 급등 종목 🔥\n\n"
