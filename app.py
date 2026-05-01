@@ -446,7 +446,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==========================================#
     chat_id = update.message.chat.id
     save_chat_id(chat_id)
-    print(f"chat_id 확인: {chat_id}")
 # ==========================================#
     text   = update.message.text.strip().upper()
     parts  = text.split()
@@ -544,7 +543,7 @@ async def auto_surge_loop(app):
 
     while True:
 
-        chat_id = load_chat_id()
+        chat_id = os.environ.get('CHAT_ID')
 
         if chat_id:
 
