@@ -206,12 +206,18 @@ def get_realtime_price(ticker):
 # 공포탐욕지수
 # ==========================================
 def get_fear_greed():
+    urls = [
+        "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+        "https://fear-and-greed-index.p.rapidapi.com/v1/fgi",
+        "https://api.alternative.me/fng/",  # ✅ 가장 안정적인 무료 API
+    ]
+
+    # alternative.me API 시도
     try:
-        url  = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        res  = requests.get(url, timeout=5, headers={'User-Agent': 'Mozilla/5.0'})
+        res  = requests.get("https://api.alternative.me/fng/", timeout=5)
         data = res.json()
-        score  = round(float(data['fear_and_greed']['score']))
-        rating = data['fear_and_greed']['rating']
+        score  = int(data['data'][0]['value'])
+        rating = data['data'][0]['value_classification']
 
         if score <= 25:   label = "극도의 공포 - 매수 기회"
         elif score <= 45: label = "공포 - 매수 고려"
@@ -220,10 +226,10 @@ def get_fear_greed():
         else:             label = "극도의 탐욕 - 매도 주의"
 
         return score, label
+
     except Exception as e:
         print(f"공포탐욕지수 오류: {e}")
         return None, None
-
 
 # ==========================================
 # 뉴스 감성 분석
