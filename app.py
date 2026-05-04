@@ -483,18 +483,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ticker = parts[0]
     mode   = '기본'
 
+    # ✅ 몬테카를로 명령어 추가
+    if len(parts) >= 2 and parts[1] in ['MC', 'MONTE', '몬테']:
+        await update.message.reply_text(
+            f"[분석 중] {ticker} 몬테카를로 시뮬레이션 중... 잠시만 기다려주세요."
+        )
+        result = montecarlo(ticker)
+        if result is None:
+            await update.message.reply_text(
+                f"[오류] {ticker} 데이터를 가져오지 못했습니다."
+            )
+        else:
+            await update.message.reply_text(result, parse_mode='Markdown')
+        return
+
     if len(parts) >= 2:
         if parts[1] in ['단타', '5M', '5분']:    mode = '단타'
         elif parts[1] in ['스윙', '1H', '1시간']: mode = '스윙'
 
-    await update.message.reply_text(f"[분석 중] {ticker} [{MODE_CONFIG[mode]['label']}] 잠시만 기다려주세요.")
+    await update.message.reply_text(
+        f"[분석 중] {ticker} [{MODE_CONFIG[mode]['label']}] 잠시만 기다려주세요."
+    )
 
     report, chart_buf = analyze(ticker, mode)
 
     if report is None:
         await update.message.reply_text(
             f"[오류] {ticker} 데이터를 가져오지 못했습니다.\n"
-            f"입력: AAPL / AAPL 단타 / AAPL 스윙"
+            f"입력: AAPL / AAPL 단타 / AAPL 스윙 / AAPL mc"
         )
         return
 
@@ -547,7 +563,86 @@ def detect_smart_money(df):
     except Exception as e:
         print(f"세력 감지 오류: {e}")
     return score, signals
+# ==========================================
+# 몬테카를로 시뮬레이션
+# ==========================================
+def montecarlo(ticker, simulations=1000):
+    try:
+        df = yf.download(ticker, period='1y', interval='1d', progress=False)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.droplevel(1)
+        if df.empty or len(df) < 30:
+            return None
 
+        closes = df['Close'].values.flatten()
+        results = {7: [], 30: [], 90: []}
+
+        for hold_days in [7, 30, 90]:
+            for _ in range(simulations):
+                max_idx  = len(closes) - hold_days - 1
+                if max_idx <= 0:
+                    continue
+                buy_idx  = random.randint(0, max_idx)
+                sell_idx = buy_idx + hold_days
+
+                buy_price  = float(closes[buy_idx])
+                sell_price = float(closes[sell_idx])
+
+                if buy_price <= 0:
+                    continue
+
+                profit = (sell_price - buy_price) / buy_price * 100
+                results[hold_days].append(profit)
+
+        report_lines = [f"*[{ticker}] Monte Carlo Simulation*",
+                        f"Simulations: {simulations} times\n"]
+
+        best_period = None
+        best_winrate = 0
+
+        for hold_days, res in results.items():
+            if not res:
+                continue
+
+            arr      = np.array(res)
+            win_rate = float((arr > 0).mean() * 100)
+            avg_ret  = float(arr.mean())
+            max_p    = float(arr.max())
+            max_l    = float(arr.min())
+
+            if win_rate > best_winrate:
+                best_winrate = win_rate
+                best_period  = hold_days
+
+            # 적합도 판정
+            if win_rate >= 65:   grade = "Excellent"
+            elif win_rate >= 55: grade = "Good"
+            elif win_rate >= 45: grade = "Neutral"
+            else:                grade = "Caution"
+
+            report_lines.append(
+                f"--- Hold {hold_days} days ---\n"
+                f"Win Rate: {win_rate:.1f}% | Grade: {grade}\n"
+                f"Avg Return: {avg_ret:+.1f}%\n"
+                f"Max Profit: {max_p:+.1f}% | Max Loss: {max_l:+.1f}%"
+            )
+
+        if best_period:
+            report_lines.append(
+                f"\nBest Period: {best_period} days "
+                f"(Win Rate: {best_winrate:.1f}%)"
+            )
+
+        report_lines.append(
+            "\n*Caution: Based on past data."
+            "\nDoes not guarantee future returns.*"
+        )
+
+        return "\n".join(report_lines)
+
+    except Exception as e:
+        print(f"몬테카를로 오류: {e}")
+        return None
 def find_surge_stocks():
     surged = []
 
