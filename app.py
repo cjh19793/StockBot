@@ -206,18 +206,15 @@ def get_realtime_price(ticker):
 # 공포탐욕지수
 # ==========================================
 def get_fear_greed():
-    urls = [
-        "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
-        "https://fear-and-greed-index.p.rapidapi.com/v1/fgi",
-        "https://api.alternative.me/fng/",  # ✅ 가장 안정적인 무료 API
-    ]
-
-    # alternative.me API 시도
     try:
-        res  = requests.get("https://api.alternative.me/fng/", timeout=5)
-        data = res.json()
-        score  = int(data['data'][0]['value'])
-        rating = data['data'][0]['value_classification']
+        # CNN Fear & Greed API
+        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+        res = requests.get(url, timeout=5, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': 'https://edition.cnn.com/'
+        })
+        data  = res.json()
+        score = round(float(data['fear_and_greed']['score']))
 
         if score <= 25:   label = "극도의 공포 - 매수 기회"
         elif score <= 45: label = "공포 - 매수 고려"
@@ -228,8 +225,25 @@ def get_fear_greed():
         return score, label
 
     except Exception as e:
-        print(f"공포탐욕지수 오류: {e}")
-        return None, None
+        print(f"CNN 오류: {e}")
+
+        # CNN 실패 시 alternative.me 백업
+        try:
+            res   = requests.get("https://api.alternative.me/fng/?limit=1&format=json", timeout=5)
+            data  = res.json()
+            score = int(data['data'][0]['value'])
+
+            if score <= 25:   label = "극도의 공포 - 매수 기회"
+            elif score <= 45: label = "공포 - 매수 고려"
+            elif score <= 55: label = "중립"
+            elif score <= 75: label = "탐욕 - 매도 고려"
+            else:             label = "극도의 탐욕 - 매도 주의"
+
+            return score, label
+
+        except Exception as e2:
+            print(f"alternative.me 오류: {e2}")
+            return None, None
 
 # ==========================================
 # 뉴스 감성 분석
