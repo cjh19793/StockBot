@@ -24,9 +24,9 @@ TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID        = os.environ.get('CHAT_ID')
 
 MODE_CONFIG = {
-    '단타': {'interval': '5m',  'period': '5d',  'label': '5분봉 (단타)',   'bar_width': 0.003},
-    '스윙': {'interval': '1h',  'period': '60d', 'label': '1시간봉 (스윙)', 'bar_width': 0.03},
-    '기본': {'interval': '1d',  'period': '6mo', 'label': '일봉 (기본)',    'bar_width': 0.6},
+    '단타': {'interval': '5m',  'period': '5d',  'label': '5min (Scalping)',  'bar_width': 0.003},
+    '스윙': {'interval': '1h',  'period': '60d', 'label': '1hour (Swing)',    'bar_width': 0.03},
+    '기본': {'interval': '1d',  'period': '6mo', 'label': 'Daily (Basic)',    'bar_width': 0.6},
 }
 
 # ==========================================
@@ -165,20 +165,20 @@ def detect_signal(df):
 
 def final_judgment(buy_score, sell_score):
     if buy_score == 0 and sell_score == 0:
-        return "[중립] 관망", "gray", "중립"
+        return "[Neutral] Watch", "gray", "Neutral"
     if buy_score > sell_score:
-        if buy_score >= 6:   label = "매우 강한 매수"
-        elif buy_score >= 4: label = "강한 매수"
-        elif buy_score >= 2: label = "중간 매수"
-        else:                label = "약한 매수"
-        return f"[매수] {label}", "blue", f"[매수] {label}"
+        if buy_score >= 6:   label = "Strong Buy"
+        elif buy_score >= 4: label = "Buy"
+        elif buy_score >= 2: label = "Weak Buy"
+        else:                label = "Slight Buy"
+        return f"[Buy] {label}", "blue", f"[Buy] {label}"
     if sell_score > buy_score:
-        if sell_score >= 6:   label = "매우 강한 매도"
-        elif sell_score >= 4: label = "강한 매도"
-        elif sell_score >= 2: label = "중간 매도"
-        else:                 label = "약한 매도"
-        return f"[매도] {label}", "red", f"[매도] {label}"
-    return "[중립] 균형", "gray", "균형"
+        if sell_score >= 6:   label = "Strong Sell"
+        elif sell_score >= 4: label = "Sell"
+        elif sell_score >= 2: label = "Weak Sell"
+        else:                 label = "Slight Sell"
+        return f"[Sell] {label}", "red", f"[Sell] {label}"
+    return "[Neutral] Balance", "gray", "Balance"
 
 # ==========================================
 # 5. 장 상태
@@ -187,10 +187,10 @@ def get_market_status():
     et      = datetime.datetime.now(pytz.timezone('America/New_York'))
     et_hour = et.hour + et.minute / 60
     if et.weekday() < 5 and 9.5 <= et_hour < 16:
-        return "[장중] 미국 시장 거래 중", True
+        return "[Open] US Market Trading", True
     elif et.weekday() < 5 and (4 <= et_hour < 9.5 or 16 <= et_hour < 20):
-        return "[시간외] 프리/애프터 마켓", False
-    return "[마감] 미국 시장 종료", False
+        return "[Extended] Pre/After Market", False
+    return "[Closed] US Market Closed", False
 # 실시간 현재가 가져오기
 def get_realtime_price(ticker):
     try:
@@ -296,26 +296,26 @@ def get_earnings_date(ticker):
         stock    = yf.Ticker(ticker)
         calendar = stock.calendar
 
-        if calendar is None or calendar.empty:
+        if not calendar:
             return None
 
-        # 실적 발표일 가져오기
-        if 'Earnings Date' in calendar.index:
-            earn_date = calendar.loc['Earnings Date'].iloc[0]
-            earn_date = pd.Timestamp(earn_date).date()
-            today     = datetime.date.today()
-            days_left = (earn_date - today).days
+        
+        earn_date = calendar.get('Earnings Date')
+        if not earn_date:
+            return None
 
-            if days_left < 0:
-                return f"지난 실적: {earn_date}"
-            elif days_left == 0:
-                return f"오늘 실적 발표!"
-            elif days_left <= 7:
-                return f"실적 발표 {days_left}일 후 ({earn_date}) - 주의"
-            else:
-                return f"실적 발표: {earn_date} ({days_left}일 후)"
+        earn_date = pd.Timestamp(earn_date[0]).date()
+        today     = datetime.date.today()
+        days_left = (earn_date - today).days
 
-        return None
+        if days_left < 0:
+            return f"지난 실적: {earn_date}"
+        elif days_left == 0:
+            return "오늘 실적 발표!"
+        elif days_left <= 7:
+            return f"실적 발표 {days_left}일 후 ({earn_date}) - 주의"
+        else:
+            return f"실적 발표: {earn_date} ({days_left}일 후)"
 
     except Exception as e:
         print(f"실적 발표일 오류: {e}")
@@ -368,9 +368,9 @@ def analyze(ticker, mode='기본'):
     buy_text  = "\n".join([f"[매수] {s}" for s in buy_signals])  or "없음"
     sell_text = "\n".join([f"[매도] {s}" for s in sell_signals]) or "없음"
 
-    if '매수' in judgment:   action = "*매수 타이밍* - 분할 매수 고려 (한 번에 전부 X)"
-    elif '매도' in judgment: action = "*매도 타이밍* - 분할 매도 고려 (익절/손절 확인)"
-    else:                    action = "*관망 타이밍* - 신호 확인될 때까지 대기"
+    if 'Buy' in judgment:    action = "*Buy Timing* - Consider split buying"
+    elif 'Sell' in judgment: action = "*Sell Timing* - Consider split selling"
+    else:                    action = "*Watch* - Wait for signal confirmation"
     # 공포탐욕지수 텍스트
     if fg_score is not None:
         fg_text = f"{fg_score}점 - {fg_label}"
@@ -637,7 +637,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
 
-    # ✅ 태스크 참조 저장해서 정상 종료
+
     surge_task = None
 
     async def start_background(app):
