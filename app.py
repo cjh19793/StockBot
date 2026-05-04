@@ -190,7 +190,17 @@ def get_market_status():
     elif et.weekday() < 5 and (4 <= et_hour < 9.5 or 16 <= et_hour < 20):
         return "[시간외] 프리/애프터 마켓", False
     return "[마감] 미국 시장 종료", False
-
+# 실시간 현재가 가져오기
+def get_realtime_price(ticker):
+    try:
+        df = yf.download(ticker, period='1d', interval='5m', progress=False)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.droplevel(1)
+        if df.empty:
+            return None
+        return float(df['Close'].iloc[-1])
+    except:
+        return None
 # ==========================================
 # 6. 분석 + 차트
 # ==========================================
@@ -205,7 +215,17 @@ def analyze(ticker, mode='기본'):
 
     df = calc_indicators(df)
 
-    curr  = get_value(df['Close'])
+    # ✅ 장중이면 실시간 가격으로 교체
+    market, is_open = get_market_status()
+    realtime        = get_realtime_price(ticker)
+
+    if is_open and realtime:
+        curr        = realtime
+        price_label = f"*{curr:.2f}* (실시간)"
+    else:
+        curr        = get_value(df['Close'])
+        price_label = f"*{curr:.2f}* (전일 종가)"
+
     rsi   = get_value(df['RSI'])
     upper = get_value(df['Upper'])
     lower = get_value(df['Lower'])
@@ -217,7 +237,6 @@ def analyze(ticker, mode='기본'):
 
     now_str      = df.index[-1].strftime('%Y-%m-%d') if mode == '기본' else str(df.index[-1])[:16]
     kt_str       = datetime.datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M (KST)')
-    market, _    = get_market_status()
     target_price = curr * 1.05
     stop_loss    = curr * 0.97
 
@@ -236,7 +255,8 @@ def analyze(ticker, mode='기본'):
         f"기준: {now_str} | 조회: {kt_str}\n"
         f"{market}\n"
         f"--------------------\n"
-        f"현재가: *{curr:.2f}* | 목표가: {target_price:.2f} | 손절가: {stop_loss:.2f}\n"
+        f"현재가: {price_label}\n"          # ✅ 실시간/종가 표시
+        f"목표가: {target_price:.2f} (+5%) | 손절가: {stop_loss:.2f} (-3%)\n"
         f"거래량: {vol:,.0f}\n"
         f"RSI: {rsi:.1f} | MACD: {macd:.3f} | Stoch K: {sk:.1f}\n"
         f"MA5: {ma5:.2f} | MA20: {ma20:.2f}\n"
