@@ -10,6 +10,7 @@ import datetime
 import pytz
 import asyncio
 import random
+import requests
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
@@ -202,6 +203,104 @@ def get_realtime_price(ticker):
     except:
         return None
 # ==========================================
+# 공포탐욕지수
+# ==========================================
+def get_fear_greed():
+    try:
+        url  = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+        res  = requests.get(url, timeout=5, headers={'User-Agent': 'Mozilla/5.0'})
+        data = res.json()
+        score  = round(float(data['fear_and_greed']['score']))
+        rating = data['fear_and_greed']['rating']
+
+        if score <= 25:   label = "극도의 공포 - 매수 기회"
+        elif score <= 45: label = "공포 - 매수 고려"
+        elif score <= 55: label = "중립"
+        elif score <= 75: label = "탐욕 - 매도 고려"
+        else:             label = "극도의 탐욕 - 매도 주의"
+
+        return score, label
+    except Exception as e:
+        print(f"공포탐욕지수 오류: {e}")
+        return None, None
+
+
+# ==========================================
+# 뉴스 감성 분석
+# ==========================================
+def get_news_sentiment(ticker):
+    try:
+        url    = f"https://query1.finance.yahoo.com/v1/finance/search?q={ticker}&newsCount=5"
+        res    = requests.get(url, timeout=5, headers={'User-Agent': 'Mozilla/5.0'})
+        data   = res.json()
+        news   = data.get('news', [])
+
+        if not news:
+            return None, []
+
+        # 긍정/부정 키워드
+        positive = ['beat', 'surge', 'gain', 'rise', 'up', 'high', 'growth',
+                    'profit', 'record', 'strong', 'buy', 'upgrade', 'bullish']
+        negative = ['miss', 'fall', 'drop', 'down', 'low', 'loss', 'weak',
+                    'sell', 'downgrade', 'bearish', 'cut', 'risk', 'warn']
+
+        pos_count = 0
+        neg_count = 0
+        titles    = []
+
+        for n in news[:5]:
+            title = n.get('title', '').lower()
+            titles.append(n.get('title', ''))
+            pos_count += sum(1 for w in positive if w in title)
+            neg_count += sum(1 for w in negative if w in title)
+
+        if pos_count > neg_count:
+            sentiment = f"긍정 ({pos_count}건)"
+        elif neg_count > pos_count:
+            sentiment = f"부정 ({neg_count}건)"
+        else:
+            sentiment = "중립"
+
+        return sentiment, titles[:3]
+
+    except Exception as e:
+        print(f"뉴스 감성 오류: {e}")
+        return None, []
+
+
+# ==========================================
+# 실적 발표일
+# ==========================================
+def get_earnings_date(ticker):
+    try:
+        stock    = yf.Ticker(ticker)
+        calendar = stock.calendar
+
+        if calendar is None or calendar.empty:
+            return None
+
+        # 실적 발표일 가져오기
+        if 'Earnings Date' in calendar.index:
+            earn_date = calendar.loc['Earnings Date'].iloc[0]
+            earn_date = pd.Timestamp(earn_date).date()
+            today     = datetime.date.today()
+            days_left = (earn_date - today).days
+
+            if days_left < 0:
+                return f"지난 실적: {earn_date}"
+            elif days_left == 0:
+                return f"오늘 실적 발표!"
+            elif days_left <= 7:
+                return f"실적 발표 {days_left}일 후 ({earn_date}) - 주의"
+            else:
+                return f"실적 발표: {earn_date} ({days_left}일 후)"
+
+        return None
+
+    except Exception as e:
+        print(f"실적 발표일 오류: {e}")
+        return None
+# ==========================================
 # 6. 분석 + 차트
 # ==========================================
 def analyze(ticker, mode='기본'):
@@ -215,9 +314,12 @@ def analyze(ticker, mode='기본'):
 
     df = calc_indicators(df)
 
-    # ✅ 장중이면 실시간 가격으로 교체
+    
     market, is_open = get_market_status()
     realtime        = get_realtime_price(ticker)
+    fg_score, fg_label       = get_fear_greed()
+    sentiment, news_titles   = get_news_sentiment(ticker)
+    earnings                 = get_earnings_date(ticker)
 
     if is_open and realtime:
         curr        = realtime
@@ -249,18 +351,39 @@ def analyze(ticker, mode='기본'):
     if '매수' in judgment:   action = "*매수 타이밍* - 분할 매수 고려 (한 번에 전부 X)"
     elif '매도' in judgment: action = "*매도 타이밍* - 분할 매도 고려 (익절/손절 확인)"
     else:                    action = "*관망 타이밍* - 신호 확인될 때까지 대기"
+    # 공포탐욕지수 텍스트
+    if fg_score is not None:
+        fg_text = f"{fg_score}점 - {fg_label}"
+    else:
+        fg_text = "가져오기 실패"
+
+    # 뉴스 텍스트
+    if sentiment:
+        news_text = f"감성: {sentiment}\n"
+        news_text += "\n".join([f"  - {t}" for t in news_titles])
+    else:
+        news_text = "뉴스 없음"
+
+    # 실적 발표 텍스트
+    earnings_text = earnings if earnings else "정보 없음"
 
     report = (
         f"*[{ticker}] {label} 분석 리포트*\n"
         f"기준: {now_str} | 조회: {kt_str}\n"
         f"{market}\n"
         f"--------------------\n"
-        f"현재가: {price_label}\n"          # ✅ 실시간/종가 표시
+        f"현재가: {price_label}\n"
         f"목표가: {target_price:.2f} (+5%) | 손절가: {stop_loss:.2f} (-3%)\n"
         f"거래량: {vol:,.0f}\n"
         f"RSI: {rsi:.1f} | MACD: {macd:.3f} | Stoch K: {sk:.1f}\n"
         f"MA5: {ma5:.2f} | MA20: {ma20:.2f}\n"
         f"BB상단: {upper:.2f} | BB하단: {lower:.2f}\n\n"
+        f"--------------------\n"
+        f"*시장 심리*\n"
+        f"공포탐욕지수: {fg_text}\n"
+        f"실적 발표: {earnings_text}\n\n"
+        f"*뉴스 감성*\n"
+        f"{news_text}\n\n"
         f"--------------------\n"
         f"*매수 신호 ({buy_score}점)*\n{buy_text}\n\n"
         f"*매도 신호 ({sell_score}점)*\n{sell_text}\n\n"
