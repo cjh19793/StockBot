@@ -474,10 +474,25 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
 
-    async def start_background(app):
-        asyncio.create_task(auto_surge_loop(app))
+    # ✅ 태스크 참조 저장해서 정상 종료
+    surge_task = None
 
-    app.post_init = start_background
+    async def start_background(app):
+        nonlocal surge_task
+        surge_task = asyncio.create_task(auto_surge_loop(app))
+
+    async def stop_background(app):
+        nonlocal surge_task
+        if surge_task and not surge_task.done():
+            surge_task.cancel()
+            try:
+                await surge_task
+            except asyncio.CancelledError:
+                pass
+        print("백그라운드 태스크 종료")
+
+    app.post_init  = start_background
+    app.post_stop  = stop_background  # ✅ 종료 시 정리
     app.run_polling()
 
 if __name__ == "__main__":
