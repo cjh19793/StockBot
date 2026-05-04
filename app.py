@@ -483,12 +483,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ticker = parts[0]
     mode   = '기본'
 
-    # ✅ 몬테카를로 명령어 추가
+    # ✅ 몬테카를로 명령어
     if len(parts) >= 2 and parts[1] in ['MC', 'MONTE', '몬테']:
+        mc_mode = '기본'
+        if len(parts) >= 3:
+            if parts[2] in ['단타', '5M', '5분']:    mc_mode = '단타'
+            elif parts[2] in ['스윙', '1H', '1시간']: mc_mode = '스윙'
+            elif parts[2] in ['장기', 'LONG']:        mc_mode = '장기'
+
         await update.message.reply_text(
-            f"[분석 중] {ticker} 몬테카를로 시뮬레이션 중... 잠시만 기다려주세요."
+            f"[분석 중] {ticker} Monte Carlo ({mc_mode}) 잠시만 기다려주세요."
         )
-        result = montecarlo(ticker)
+        result = montecarlo(ticker, mc_mode)
         if result is None:
             await update.message.reply_text(
                 f"[오류] {ticker} 데이터를 가져오지 못했습니다."
@@ -510,7 +516,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if report is None:
         await update.message.reply_text(
             f"[오류] {ticker} 데이터를 가져오지 못했습니다.\n"
-            f"입력: AAPL / AAPL 단타 / AAPL 스윙 / AAPL mc"
+            f"입력: AAPL / AAPL 단타 / AAPL 스윙 / AAPL mc / AAPL mc 단타"
         )
         return
 
@@ -520,7 +526,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         read_timeout=60, write_timeout=60, connect_timeout=60, pool_timeout=60,
         caption=f"{ticker} {MODE_CONFIG[mode]['label']} 차트"
     )
-
 # ==========================================
 # 8. 나스닥 티커 + 세력 감지 + 급등 스캔
 # ==========================================
@@ -566,38 +571,67 @@ def detect_smart_money(df):
 # ==========================================
 # 몬테카를로 시뮬레이션
 # ==========================================
-def montecarlo(ticker, simulations=1000):
+# ==========================================
+# 몬테카를로 시뮬레이션
+# ==========================================
+def montecarlo(ticker, mc_mode='기본', simulations=1000):
     try:
-        df = yf.download(ticker, period='1y', interval='1d', progress=False)
+        # ✅ 모드별 설정
+        mc_config = {
+            '단타': {
+                'period'    : '3mo',
+                'hold_days' : [1, 3, 7],
+                'label'     : 'Scalping (1/3/7 days)'
+            },
+            '스윙': {
+                'period'    : '6mo',
+                'hold_days' : [7, 14, 30],
+                'label'     : 'Swing (7/14/30 days)'
+            },
+            '기본': {
+                'period'    : '1y',
+                'hold_days' : [7, 30, 90],
+                'label'     : 'Basic (7/30/90 days)'
+            },
+            '장기': {
+                'period'    : '2y',
+                'hold_days' : [90, 180, 365],
+                'label'     : 'Long-term (90/180/365 days)'
+            },
+        }
+
+        cfg = mc_config.get(mc_mode, mc_config['기본'])
+
+        df = yf.download(ticker, period=cfg['period'], interval='1d', progress=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.droplevel(1)
         if df.empty or len(df) < 30:
             return None
 
-        closes = df['Close'].values.flatten()
-        results = {7: [], 30: [], 90: []}
+        closes  = df['Close'].values.flatten()
+        results = {d: [] for d in cfg['hold_days']}
 
-        for hold_days in [7, 30, 90]:
+        for hold_days in cfg['hold_days']:
             for _ in range(simulations):
-                max_idx  = len(closes) - hold_days - 1
+                max_idx = len(closes) - hold_days - 1
                 if max_idx <= 0:
                     continue
-                buy_idx  = random.randint(0, max_idx)
-                sell_idx = buy_idx + hold_days
-
+                buy_idx    = random.randint(0, max_idx)
+                sell_idx   = buy_idx + hold_days
                 buy_price  = float(closes[buy_idx])
                 sell_price = float(closes[sell_idx])
-
                 if buy_price <= 0:
                     continue
+                results[hold_days].append(
+                    (sell_price - buy_price) / buy_price * 100
+                )
 
-                profit = (sell_price - buy_price) / buy_price * 100
-                results[hold_days].append(profit)
+        report_lines = [
+            f"*[{ticker}] Monte Carlo - {cfg['label']}*",
+            f"Simulations: {simulations} | Data: {cfg['period']}\n"
+        ]
 
-        report_lines = [f"*[{ticker}] Monte Carlo Simulation*",
-                        f"Simulations: {simulations} times\n"]
-
-        best_period = None
+        best_period  = None
         best_winrate = 0
 
         for hold_days, res in results.items():
@@ -614,7 +648,6 @@ def montecarlo(ticker, simulations=1000):
                 best_winrate = win_rate
                 best_period  = hold_days
 
-            # 적합도 판정
             if win_rate >= 65:   grade = "Excellent"
             elif win_rate >= 55: grade = "Good"
             elif win_rate >= 45: grade = "Neutral"
