@@ -751,7 +751,7 @@ async def auto_surge_loop(app):
         else:
             print("장 마감 - 스캔 스킵")
 
-        await asyncio.sleep(180)
+        await asyncio.sleep(1800)
 
 async def error_handler(update, context):
     print(f"에러: {context.error}")
