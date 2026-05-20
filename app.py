@@ -8,10 +8,8 @@ import io
 import os
 import datetime
 import pytz
-import asyncio
-import random
 import requests
-
+import random
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
@@ -21,7 +19,6 @@ plt.rcParams['axes.unicode_minus'] = False
 # 1. 설정
 # ==========================================
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
-CHAT_ID        = os.environ.get('CHAT_ID')
 
 MODE_CONFIG = {
     '단타': {'interval': '5m',  'period': '5d',  'label': '5min (Scalping)',  'bar_width': 0.003},
@@ -526,51 +523,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         read_timeout=60, write_timeout=60, connect_timeout=60, pool_timeout=60,
         caption=f"{ticker} {MODE_CONFIG[mode]['label']} 차트"
     )
-# ==========================================
-# 8. 나스닥 티커 + 세력 감지 + 급등 스캔
-# ==========================================
-def get_nasdaq_tickers():
-    url     = "https://raw.githubusercontent.com/datasets/nasdaq-listings/master/data/nasdaq-listed-symbols.csv"
-    tickers = [t for t in pd.read_csv(url)["Symbol"].dropna() if str(t).isalpha() and len(t) <= 5]
-    random.shuffle(tickers)
-    return tickers[:200]
 
-def detect_smart_money(df):
-    score, signals = 0, []
-    try:
-        avg_vol      = float(df['Volume'].rolling(20).mean().iloc[-1])
-        curr_vol     = float(df['Volume'].iloc[-1])
-        vol_ratio    = curr_vol / avg_vol if avg_vol > 0 else 0
-        curr_close   = float(df['Close'].iloc[-1])
-        prev_close   = float(df['Close'].iloc[-2])
-        price_change = (curr_close - prev_close) / prev_close * 100
-
-        if vol_ratio >= 5:
-            score += 3; signals.append(f"거래량 {vol_ratio:.1f}배 - 세력 강한 의심")
-        elif vol_ratio >= 3:
-            score += 2; signals.append(f"거래량 {vol_ratio:.1f}배 - 세력 의심")
-
-        if curr_close > float(df['Close'].rolling(20).max().iloc[-2]):
-            score += 2; signals.append("20일 고점 돌파")
-
-        if vol_ratio >= 3 and price_change < 2:
-            score += 3; signals.append("거래량 대비 가격 낮음 - 매집 의심")
-
-        if len(df) >= 3:
-            last3 = df['Close'].iloc[-3:].values.flatten()
-            if last3[0] < last3[1] < last3[2]:
-                score += 1; signals.append("3연속 양봉")
-
-        et_hour = datetime.datetime.now(pytz.timezone('America/New_York')).hour
-        if 9 <= et_hour <= 10 or 15 <= et_hour <= 16:
-            score += 1; signals.append("세력 주요 활동 시간대")
-
-    except Exception as e:
-        print(f"세력 감지 오류: {e}")
-    return score, signals
-# ==========================================
-# 몬테카를로 시뮬레이션
-# ==========================================
 # ==========================================
 # 몬테카를로 시뮬레이션
 # ==========================================
@@ -676,114 +629,18 @@ def montecarlo(ticker, mc_mode='기본', simulations=1000):
     except Exception as e:
         print(f"몬테카를로 오류: {e}")
         return None
-def find_surge_stocks():
-    surged = []
-
-    for ticker in get_nasdaq_tickers():
-        try:
-            data = yf.download(ticker, period="5d", interval="5m", progress=False)
-            if isinstance(data.columns, pd.MultiIndex):
-                data.columns = data.columns.droplevel(1)
-            if len(data) < 20:
-                continue
-
-            change = (float(data['Close'].iloc[-1]) - float(data['Close'].iloc[0])) / float(data['Close'].iloc[0]) * 100
-            if change < 2:
-                continue
-
-            curr_price = float(data['Close'].iloc[-1])
-            print(f"{ticker}: {change:.2f}%")
-
-            try:
-                buy_5m, _, sell_5m, _ = detect_signal(calc_indicators(data.copy()))
-            except:
-                buy_5m, sell_5m = 0, 0
-
-            try:
-                d1 = yf.download(ticker, period="6mo", interval="1d", progress=False)
-                if isinstance(d1.columns, pd.MultiIndex): d1.columns = d1.columns.droplevel(1)
-                buy_1d, _, sell_1d, _ = detect_signal(calc_indicators(d1)) if not d1.empty else (0, [], 0, [])
-            except:
-                buy_1d, sell_1d = 0, 0
-
-            smart_score, _ = detect_smart_money(data)
-            total_score    = buy_5m + buy_1d + smart_score
-
-            surged.append((ticker, change, curr_price, buy_5m, sell_5m, buy_1d, sell_1d, smart_score, total_score))
-
-        except Exception as e:
-            print(f"{ticker} 오류: {e}")
-
-    surged.sort(key=lambda x: x[8], reverse=True)
-
-    result = []
-    for i, (ticker, change, _, buy_5m, sell_5m, buy_1d, sell_1d, smart_score, total_score) in enumerate(surged[:10], 1):
-        if total_score >= 8:   overall = "강력 매수"
-        elif total_score >= 5: overall = "매수 고려"
-        elif total_score >= 3: overall = "관망"
-        else:                  overall = "주의"
-
-        smart_label = "[세력 강한 의심]" if smart_score >= 5 else "[세력 의심]" if smart_score >= 3 else ""
-        result.append(f"{i}. {ticker} +{change:.2f}% | 총점:{total_score} | {overall} {smart_label}".strip())
-
-    return result
-
-# ==========================================
-# 9. 자동 스캔 루프
-# ==========================================
-async def auto_surge_loop(app):
-    await asyncio.sleep(10)
-    while True:
-        _, is_open = get_market_status()
-        if is_open and CHAT_ID:
-            print("장중 - 스캔 시작")
-            surged = find_surge_stocks()
-            print(f"감지 종목 수: {len(surged)}")
-            if surged:
-                try:
-                    await app.bot.send_message(
-                        chat_id=int(CHAT_ID),
-                        text="나스닥 선제 급등 감지\n\n" + "\n".join(surged)
-                    )
-                    print("전송 완료")
-                except Exception as e:
-                    print(f"전송 오류: {e}")
-        else:
-            print("장 마감 - 스캔 스킵")
-
-        await asyncio.sleep(1800)
-
-async def error_handler(update, context):
-    print(f"에러: {context.error}")
-
+        
 # ==========================================
 # 10. 봇 실행
 # ==========================================
+async def error_handler(update, context):
+    print(f"에러: {context.error}")
+    
 def main():
     print("텔레그램 봇 시작!")
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
-
-
-    surge_task = None
-
-    async def start_background(app):
-        nonlocal surge_task
-        surge_task = asyncio.create_task(auto_surge_loop(app))
-
-    async def stop_background(app):
-        nonlocal surge_task
-        if surge_task and not surge_task.done():
-            surge_task.cancel()
-            try:
-                await surge_task
-            except asyncio.CancelledError:
-                pass
-        print("백그라운드 태스크 종료")
-
-    app.post_init  = start_background
-    app.post_stop  = stop_background  # ✅ 종료 시 정리
     app.run_polling()
 
 if __name__ == "__main__":
