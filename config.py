@@ -1,0 +1,55 @@
+"""전역 설정, 상수, 로깅 초기화."""
+import logging
+import os
+
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO"),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
+# 텔레그램 토큰은 환경변수에서만 읽는다 (코드/저장소에 두지 않는다).
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+
+
+def require_token() -> str:
+    """토큰이 없으면 명확한 에러로 즉시 중단."""
+    if not TELEGRAM_TOKEN:
+        raise RuntimeError(
+            "환경변수 TELEGRAM_TOKEN 이 설정되지 않았습니다. "
+            "봇을 실행하기 전에 TELEGRAM_TOKEN 을 지정하세요."
+        )
+    return TELEGRAM_TOKEN
+
+
+# 분석 모드: interval / period / 차트 바 폭
+MODE_CONFIG = {
+    "단타": {"interval": "5m", "period": "5d",  "label": "5min (Scalping)", "bar_width": 0.003},
+    "스윙": {"interval": "1h", "period": "60d", "label": "1hour (Swing)",   "bar_width": 0.03},
+    "기본": {"interval": "1d", "period": "6mo", "label": "Daily (Basic)",   "bar_width": 0.6},
+}
+
+# 몬테카를로 모드
+MC_CONFIG = {
+    "단타": {"period": "3mo", "hold_days": [1, 3, 7],      "label": "Scalping (1/3/7 days)"},
+    "스윙": {"period": "6mo", "hold_days": [7, 14, 30],    "label": "Swing (7/14/30 days)"},
+    "기본": {"period": "1y",  "hold_days": [7, 30, 90],    "label": "Basic (7/30/90 days)"},
+    "장기": {"period": "2y",  "hold_days": [90, 180, 365], "label": "Long-term (90/180/365 days)"},
+}
+
+# 사용자 입력 별칭 → 표준 모드 이름
+MODE_ALIASES = {
+    "단타": "단타", "5M": "단타", "5분": "단타",
+    "스윙": "스윙", "1H": "스윙", "1시간": "스윙",
+    "기본": "기본", "1D": "기본", "일봉": "기본",
+    "장기": "장기", "LONG": "장기",
+}
+
+# 매매 파라미터
+TARGET_PCT = 0.05   # 목표가 +5%
+STOP_PCT = 0.03     # 손절가 -3%
+
+# 조회 결과 TTL 캐시 (초)
+CACHE_TTL_OHLC = 90
+CACHE_TTL_REALTIME = 30
+CACHE_TTL_MARKET = 300
+CACHE_TTL_EARNINGS = 3600

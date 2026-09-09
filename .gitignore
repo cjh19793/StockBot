@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 가상환경
+.venv/
+venv/
+
+# IDE / 로컬 도구 설정
+.idea/
+.mcp.json
+
+# 환경변수 / 로그
+.env
+*.log
