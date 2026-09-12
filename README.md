@@ -23,6 +23,27 @@ python app.py
 
 `TELEGRAM_TOKEN` 은 환경변수로만 주입한다 (코드/저장소에 두지 않는다).
 
+### 웹 API (로컬)
+
+```bash
+.venv/Scripts/pip install -r requirements.txt
+.venv/Scripts/python -m uvicorn webapi.main:app --reload   # http://127.0.0.1:8000
+# 문서: /docs  (Swagger UI)
+```
+
+봇과는 별개 프로세스이며 `TELEGRAM_TOKEN` 이 필요 없다.
+
+| 엔드포인트 | 설명 |
+| --- | --- |
+| `GET /health` | 상태 확인 |
+| `GET /api/modes` | 지원 분석/몬테카를로 모드 + 별칭 |
+| `GET /api/analyze/{ticker}?mode=` | 분석 결과 JSON (`engine.run_analysis`) |
+| `GET /api/chart/{ticker}.png?mode=` | 분석 차트 PNG (`charts.build_chart`) |
+| `GET /api/montecarlo/{ticker}?mode=&simulations=` | 부트스트랩 시뮬레이션 JSON |
+
+`mode` 는 봇과 동일한 값/별칭(`기본`·`단타`·`스윙`, `5m`·`1h`·`1d` …, MC 는 `장기` 추가). 없으면 `기본`.
+`TickerNotFound` → 404, `UpstreamDataError` → 502, 잘못된 티커/모드 → 422.
+
 ### 배포 (Railway)
 
 - 빌드: Nixpacks 가 `.python-version`(3.13) + `requirements.txt` 로 자동 구성
@@ -32,19 +53,26 @@ python app.py
 
 ## 모듈 구성
 
-| 파일 | 역할 |
-| --- | --- |
-| `config.py` | 설정·상수·로깅, 토큰 검증 |
-| `util.py` | yfinance 컬럼 평탄화, TTL 캐시 |
-| `data.py` | 가격 데이터 조회 |
-| `indicators.py` | 지표 계산 (MA/BB/RSI/MACD/Stoch) |
-| `signals.py` | 매수·매도 신호 스코어링, 최종 판정 |
-| `market.py` | 장 상태, 공포탐욕지수, 뉴스 감성, 실적일 |
-| `charts.py` | 5단 차트 렌더링 |
-| `montecarlo.py` | 과거 구간 부트스트랩 시뮬레이션 |
-| `analysis.py` | 리포트+차트 조립 (부가 정보 병렬 조회) |
-| `bot.py` | 텔레그램 핸들러 및 실행 |
-| `app.py` | 진입점 |
+분석 엔진(공용) / 표현 계층(텔레그램) 분리:
+
+| 파일 | 역할 | 계층 |
+| --- | --- | --- |
+| `config.py` | 설정·상수·로깅, 토큰 검증 | 공용 |
+| `util.py` | yfinance 컬럼 평탄화, TTL 캐시 | 공용 |
+| `data.py` | 가격 데이터 조회 | 공용 |
+| `indicators.py` | 지표 계산 (MA/BB/RSI/MACD/Stoch) | 공용 |
+| `signals.py` | 매수·매도 신호 스코어링, 최종 판정 | 공용 |
+| `market.py` | 장 상태, 공포탐욕지수, 뉴스 감성, 실적일 | 공용 |
+| `charts.py` | 5단 차트 렌더링 (PNG) | 공용 |
+| `models.py` | `AnalysisResult` / `MonteCarloResult` dataclass | 공용 |
+| `errors.py` | 분석 엔진 예외 | 공용 |
+| `validation.py` | 티커/모드 입력 검증 | 공용 |
+| `engine.py` | `run_analysis()` — 분석 결과 계산 | 공용 엔진 |
+| `montecarlo.py` | `run_montecarlo()` 계산 + `montecarlo()` 텔레그램 래퍼 | 공용 엔진 / 텔레그램 |
+| `report_format.py` | 결과 → 텔레그램 마크다운 문자열 | 텔레그램 |
+| `analysis.py` | `analyze()` — 리포트+차트 조립 (텔레그램 래퍼) | 텔레그램 |
+| `bot.py` | 텔레그램 핸들러 및 실행 | 텔레그램 |
+| `app.py` | 진입점 | 텔레그램 |
 
 ## 테스트
 

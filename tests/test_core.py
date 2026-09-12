@@ -7,8 +7,14 @@ import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from config import MC_CONFIG, MODE_CONFIG  # noqa: E402
 from indicators import calc_indicators, get_value  # noqa: E402
+from models import (AnalysisResult, MonteCarloHold,  # noqa: E402
+                    MonteCarloResult)
+from report_format import (format_analysis_report,  # noqa: E402
+                           format_montecarlo)
 from signals import detect_signal, final_judgment  # noqa: E402
+from validation import is_valid_ticker, resolve_mode  # noqa: E402
 
 
 def _sample_df(n=120, seed=0):
@@ -67,6 +73,74 @@ def test_detect_signal_runs():
     buy_score, buy_sig, sell_score, sell_sig = detect_signal(df)
     assert isinstance(buy_score, int) and isinstance(sell_score, int)
     assert len(buy_sig) >= 0 and len(sell_sig) >= 0
+
+
+def test_validation_ticker_and_mode():
+    assert is_valid_ticker("AAPL")
+    assert is_valid_ticker("BRK-B")
+    assert is_valid_ticker("^GSPC")
+    assert not is_valid_ticker("aapl")
+    assert not is_valid_ticker("TOOLONGTICKER")
+    assert not is_valid_ticker("")
+    # 별칭 → 표준 모드
+    assert resolve_mode("5M", MODE_CONFIG) == "단타"
+    assert resolve_mode("일봉", MODE_CONFIG) == "기본"
+    assert resolve_mode("1H", MODE_CONFIG) == "스윙"
+    # "장기" 는 몬테카를로 전용 → 일반 분석 모드에는 없음
+    assert resolve_mode("장기", MODE_CONFIG) is None
+    assert resolve_mode("장기", MC_CONFIG) == "장기"
+    assert resolve_mode("헛소리", MODE_CONFIG) is None
+
+
+def _sample_result(**over):
+    base = dict(
+        ticker="AAPL", mode="기본", label="Daily (Basic)", bar_width=0.6,
+        now_str="2025-01-15", asof_kst="2025-01-15 10:30 (KST)",
+        market="[Open] US Market Trading", is_market_open=True,
+        price=137.77, price_is_realtime=True, target_price=144.66, stop_loss=133.64,
+        target_pct=0.05, stop_pct=0.03,
+        rsi=50.2, macd=-0.509, stoch_k=48.9, ma5=89.24, ma20=89.81,
+        bb_upper=91.77, bb_lower=87.84, volume=4506843.0,
+        buy_score=3, sell_score=0,
+        buy_signals=["MACD 골든크로스 - 상승 전환 신호"], sell_signals=[],
+        judgment="[Buy] Weak Buy", chart_title="[Buy] Weak Buy",
+        fear_greed_score=40, fear_greed_label="공포 - 매수 고려",
+        earnings="실적 발표: 2025-02-01 (17일 후)",
+        news_sentiment="긍정 (3건)", news_titles=["AAPL surges"],
+    )
+    base.update(over)
+    return AnalysisResult(**base)
+
+
+def test_format_analysis_report_structure():
+    txt = format_analysis_report(_sample_result())
+    assert txt.startswith("*[AAPL] Daily (Basic) 분석 리포트*")
+    assert "현재가: *137.77* (실시간)" in txt
+    assert "*매수 신호 (3점)*" in txt
+    assert "최종 판정: *[Buy] Weak Buy*" in txt
+    assert "*Buy Timing* - Consider split buying" in txt
+    # 전일 종가 / 신호 없음 분기
+    txt2 = format_analysis_report(_sample_result(price_is_realtime=False, buy_signals=[]))
+    assert "(전일 종가)" in txt2
+    assert "*매수 신호 (3점)*\n없음" in txt2
+
+
+def test_format_montecarlo_structure():
+    r = MonteCarloResult(
+        ticker="AAPL", mc_mode="기본", label="Basic (7/30/90 days)", period="1y",
+        simulations=1000,
+        holds=[
+            MonteCarloHold(7, 55.0, "Good", 1.2, 8.0, -5.0),
+            MonteCarloHold(30, 60.0, "Good", 3.4, 20.0, -12.0),
+        ],
+        best_hold_days=30, best_win_rate=60.0,
+    )
+    txt = format_montecarlo(r)
+    assert txt.startswith("*[AAPL] Monte Carlo - Basic (7/30/90 days)*")
+    assert "--- Hold 7 days ---" in txt
+    assert "Win Rate: 60.0% | Grade: Good" in txt
+    assert "Best Period: 30 days (Win Rate: 60.0%)" in txt
+    assert txt.rstrip().endswith("Does not guarantee future returns.*")
 
 
 if __name__ == "__main__":

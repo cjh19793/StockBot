@@ -1,20 +1,22 @@
-"""텔레그램 봇 핸들러 및 실행."""
+"""텔레그램 봇 핸들러 및 실행 (텔레그램 전용).
+
+분석/시뮬레이션 계산은 analysis / montecarlo (→ engine), 입력 검증은 validation.
+"""
 import asyncio
 import logging
-import re
 
 from telegram import Update
 from telegram.ext import (ApplicationBuilder, CommandHandler, ContextTypes,
                           MessageHandler, filters)
 
 from analysis import analyze
-from config import MC_CONFIG, MODE_ALIASES, MODE_CONFIG, require_token
+from config import MC_CONFIG, MODE_CONFIG, require_token
 from montecarlo import montecarlo
+from validation import MC_KEYWORDS as _MC_KEYWORDS
+from validation import TICKER_RE as _TICKER_RE
+from validation import resolve_mode as _resolve_mode
 
 log = logging.getLogger(__name__)
-
-_TICKER_RE = re.compile(r"^[A-Z0-9^][A-Z0-9.^-]{0,9}$")
-_MC_KEYWORDS = {"MC", "MONTE", "몬테"}
 
 USAGE = (
     "사용법:\n"
@@ -24,11 +26,6 @@ USAGE = (
     "  AAPL mc       몬테카를로 (기본)\n"
     "  AAPL mc 스윙  몬테카를로 (단타/스윙/장기 선택)"
 )
-
-
-def _resolve_mode(token: str, allowed) -> str | None:
-    canon = MODE_ALIASES.get(token)
-    return canon if canon in allowed else None
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):

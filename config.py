@@ -53,3 +53,10 @@ CACHE_TTL_OHLC = 90
 CACHE_TTL_REALTIME = 30
 CACHE_TTL_MARKET = 300
 CACHE_TTL_EARNINGS = 3600
+CACHE_TTL_MONTECARLO = 300  # 몬테카를로용 일봉 다운로드 (yfinance 과호출 방지)
+CACHE_TTL_CHART = 90        # 렌더링된 차트 PNG (요청마다 재렌더링 방지)
+
+# 웹 API CORS 허용 도메인. 콤마로 구분된 목록, 기본값 "*"(전체 허용 — 로컬/초기 배포용).
+# 프론트 도메인이 정해지면 예: CORS_ORIGINS="https://stockbot.example.com,https://app.example.com"
+_cors_raw = os.environ.get("CORS_ORIGINS", "*").strip()
+CORS_ORIGINS = ["*"] if _cors_raw == "*" else [o.strip() for o in _cors_raw.split(",") if o.strip()]
