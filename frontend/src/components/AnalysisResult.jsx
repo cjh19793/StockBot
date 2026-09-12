@@ -1,3 +1,6 @@
+import ScoreBadge from "./ScoreBadge";
+import ScoreBar from "./ScoreBar";
+
 function fmt(n, digits = 2) {
   return typeof n === "number" ? n.toFixed(digits) : "-";
 }
@@ -10,6 +13,8 @@ function judgmentTone(judgment) {
 
 export default function AnalysisResult({ result }) {
   const r = result;
+  const c = r.composite;
+  const regime = r.market_regime;
 
   return (
     <section className="analysis-result">
@@ -22,6 +27,24 @@ export default function AnalysisResult({ result }) {
         <div className={`judgment ${judgmentTone(r.judgment)}`}>{r.judgment}</div>
       </header>
 
+      {/* 종합점수 — 가장 먼저 보이도록 최상단에 배치. 값은 전부 백엔드(P3) 산출물 그대로. */}
+      <div className="composite-panel">
+        <div className="composite-headline">
+          <span className="composite-title">종합점수</span>
+          <ScoreBadge total={c.total} label={c.label} size="lg" />
+        </div>
+        <div className="composite-breakdown">
+          <ScoreBar label="기술적 분석" value={c.technical} />
+          <ScoreBar label="시장환경" value={c.market} />
+          <ScoreBar label="리스크(높을수록 안전)" value={c.risk} />
+        </div>
+        {!c.market_available && (
+          <p className="composite-note">
+            시장환경 데이터를 가져오지 못해 중립값(50)으로 계산되었습니다.
+          </p>
+        )}
+      </div>
+
       <div className="price-row">
         <div className="price-box">
           <span className="label">현재가</span>
@@ -29,11 +52,11 @@ export default function AnalysisResult({ result }) {
           <span className="sub">{r.price_is_realtime ? "실시간" : "전일 종가"}</span>
         </div>
         <div className="price-box">
-          <span className="label">목표가 (+{(r.target_pct * 100).toFixed(0)}%)</span>
+          <span className="label">목표가 (+{(r.target_pct * 100).toFixed(1)}%)</span>
           <span className="value up">${fmt(r.target_price)}</span>
         </div>
         <div className="price-box">
-          <span className="label">손절가 (-{(r.stop_pct * 100).toFixed(0)}%)</span>
+          <span className="label">손절가 (-{(r.stop_pct * 100).toFixed(1)}%)</span>
           <span className="value down">${fmt(r.stop_loss)}</span>
         </div>
       </div>
@@ -42,12 +65,24 @@ export default function AnalysisResult({ result }) {
         <div><span className="label">RSI</span><span>{fmt(r.rsi, 1)}</span></div>
         <div><span className="label">MACD</span><span>{fmt(r.macd)}</span></div>
         <div><span className="label">Stoch %K</span><span>{fmt(r.stoch_k, 1)}</span></div>
+        <div><span className="label">ATR</span><span>{fmt(r.atr)} ({(r.atr_pct * 100).toFixed(1)}%)</span></div>
         <div><span className="label">MA5</span><span>{fmt(r.ma5)}</span></div>
         <div><span className="label">MA20</span><span>{fmt(r.ma20)}</span></div>
         <div><span className="label">BB Upper</span><span>{fmt(r.bb_upper)}</span></div>
         <div><span className="label">BB Lower</span><span>{fmt(r.bb_lower)}</span></div>
+        <div><span className="label">지지선</span><span>{fmt(r.support)}</span></div>
+        <div><span className="label">저항선</span><span>{fmt(r.resistance)}</span></div>
         <div><span className="label">Volume</span><span>{Math.round(r.volume).toLocaleString()}</span></div>
       </div>
+
+      {regime && (
+        <div className="regime-row">
+          <h3>시장환경 <span className="regime-label">{regime.label} ({regime.score}점)</span></h3>
+          <p className="meta">S&amp;P500: {regime.sp500_trend}</p>
+          <p className="meta">NASDAQ: {regime.nasdaq_trend}</p>
+          <p className="meta">VIX: {fmt(regime.vix, 1)} ({regime.vix_level})</p>
+        </div>
+      )}
 
       <div className="signals-row">
         <div className="signals-box buy">

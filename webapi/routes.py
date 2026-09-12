@@ -19,12 +19,6 @@ from util import ttl_cache
 from validation import is_valid_ticker, resolve_mode
 from webapi import schemas
 
-# webapi.main 의 exception_handler 매핑과 동일 — /api/compare 는 예외를 던지는 대신
-# 이 상태코드를 개별 결과 항목에 담아 반환한다 (한 종목 실패가 전체 요청을 죽이지 않도록).
-_COMPARE_ERROR_STATUS = {
-    TickerNotFound: 404,
-    UpstreamDataError: 502,
-}
 _MAX_COMPARE_TICKERS = 10
 
 log = logging.getLogger(__name__)
@@ -124,9 +118,21 @@ def _run_one_for_compare(ticker: str, mode: str):
     try:
         result = run_analysis(ticker, mode)
         return schemas.AnalysisResponse.model_validate(result), None
-    except AnalysisError as exc:
-        status = _COMPARE_ERROR_STATUS.get(type(exc), 500)
-        return None, schemas.CompareItemError(ticker=ticker, error=str(exc), status_code=status)
+    except TickerNotFound as exc:
+        return None, schemas.CompareItemError(
+            ticker=ticker, error=f"티커 데이터를 찾을 수 없습니다: {exc}", status_code=404,
+        )
+    except UpstreamDataError as exc:
+        return None, schemas.CompareItemError(
+            ticker=ticker,
+            error=f"외부 데이터 소스 오류입니다. 잠시 후 다시 시도해주세요. ({exc})",
+            status_code=502,
+        )
+    except AnalysisError:
+        log.exception("종목 비교 중 분석 실패 (%s)", ticker)
+        return None, schemas.CompareItemError(
+            ticker=ticker, error="분석 처리 중 오류가 발생했습니다.", status_code=500,
+        )
     except Exception:
         log.exception("종목 비교 중 분석 실패 (%s)", ticker)
         return None, schemas.CompareItemError(

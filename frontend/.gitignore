@@ -8,7 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# dist 는 커밋한다 — Render 빌드 환경에 Node 가 없어 FastAPI(webapi/main.py)가
+# 이 미리 빌드된 정적 파일을 그대로 서빙한다. 프론트 소스 변경 시 반드시
+# `npm run build` 후 frontend/dist 를 함께 커밋할 것.
 dist-ssr
 *.local
 

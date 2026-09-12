@@ -37,14 +37,41 @@ python app.py
 | --- | --- |
 | `GET /health` | 상태 확인 |
 | `GET /api/modes` | 지원 분석/몬테카를로 모드 + 별칭 |
-| `GET /api/analyze/{ticker}?mode=` | 분석 결과 JSON (`engine.run_analysis`) |
+| `GET /api/analyze/{ticker}?mode=` | 분석 결과 JSON (`engine.run_analysis`, P3 종합점수 포함) |
 | `GET /api/chart/{ticker}.png?mode=` | 분석 차트 PNG (`charts.build_chart`) |
 | `GET /api/montecarlo/{ticker}?mode=&simulations=` | 부트스트랩 시뮬레이션 JSON |
+| `GET /api/compare?tickers=A,B,C&mode=` | 2~10개 종목 비교 JSON (`results`/`errors` — 실패 종목이 있어도 나머지는 정상 반환) |
 
 `mode` 는 봇과 동일한 값/별칭(`기본`·`단타`·`스윙`, `5m`·`1h`·`1d` …, MC 는 `장기` 추가). 없으면 `기본`.
 `TickerNotFound` → 404, `UpstreamDataError` → 502, 잘못된 티커/모드 → 422.
 
-### 배포 (Railway)
+### 웹 프론트엔드 (React/Vite)
+
+`frontend/` — 종합점수/기술·시장환경·리스크/목표가·손절가/차트를 보여주는 단일 분석 화면과
+`/api/compare` 를 사용하는 종목 비교 화면(2~10개, 점수순 정렬, 개별 오류 표시)으로 구성.
+프론트는 백엔드 계산값을 표시만 하며 점수/판정을 자체적으로 계산하지 않는다.
+
+```bash
+cd frontend
+npm install
+npm run dev       # http://localhost:5173, API는 VITE_API_BASE_URL(.env) 사용
+```
+
+배포 시에는 `webapi/main.py` 가 **같은 FastAPI 서비스**에서 `frontend/dist` 를 정적으로
+서빙한다(새 서비스 추가 없음). Render 빌드 환경에 Node 가 없어 이 방식을 쓰므로,
+프론트 소스를 바꾸면 반드시 아래처럼 다시 빌드해 `frontend/dist` 를 함께 커밋해야 배포에 반영된다.
+
+```bash
+cd frontend && npm run build   # frontend/dist 갱신 → git add frontend/dist 후 커밋
+```
+
+### 배포 (Render — 웹 API + 프론트)
+
+`render.yaml` 블루프린트, Free 플랜. `pip install -r requirements.txt` 만 빌드하고
+`uvicorn webapi.main:app` 이 API와 (미리 빌드된) 프론트를 함께 서빙한다.
+`CORS_ORIGINS` 환경변수로 허용 도메인 제한 가능(기본 `*`).
+
+### 배포 (Railway — 텔레그램 봇)
 
 - 빌드: Nixpacks 가 `.python-version`(3.13) + `requirements.txt` 로 자동 구성
 - 실행: `Procfile` 의 `worker: python app.py` (웹 포트 불필요, 폴링 방식)

@@ -32,3 +32,12 @@ export function chartUrl(ticker, mode) {
   if (mode) url.searchParams.set("mode", mode);
   return url.toString();
 }
+
+export async function fetchCompare(tickers, mode) {
+  const url = new URL(`${API_BASE}/api/compare`);
+  url.searchParams.set("tickers", tickers.join(","));
+  if (mode) url.searchParams.set("mode", mode);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  return res.json();
+}
