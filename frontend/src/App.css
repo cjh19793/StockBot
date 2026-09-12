@@ -1,0 +1,301 @@
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.app-header h1 {
+  margin: 0 0 4px;
+  font-size: 28px;
+}
+
+.app-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* --- 입력 폼 --- */
+.ticker-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.field input,
+.field select {
+  padding: 10px 12px;
+  font-size: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.field input {
+  text-transform: uppercase;
+}
+
+.ticker-form button {
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.ticker-form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+
+.error-message {
+  text-align: center;
+  color: var(--sell);
+  background: var(--sell-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0 0 16px;
+}
+
+/* --- 분석 결과 --- */
+.analysis-result {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.result-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.result-header h2 {
+  margin: 0;
+  font-size: 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.meta {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.judgment {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.tone-buy { background: var(--buy-bg); color: var(--buy); }
+.tone-sell { background: var(--sell-bg); color: var(--sell); }
+.tone-neutral { background: var(--bg); color: var(--text-muted); }
+
+.price-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.price-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  background: var(--bg);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.price-box .label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.price-box .value {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.price-box .value.up { color: var(--buy); }
+.price-box .value.down { color: var(--sell); }
+
+.price-box .sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.indicators-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.indicators-grid > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.indicators-grid .label {
+  color: var(--text-muted);
+}
+
+.signals-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.signals-box {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.signals-box h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.signals-box.buy h3 { color: var(--buy); }
+.signals-box.sell h3 { color: var(--sell); }
+
+.signals-box ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.signals-box .empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.sentiment-row {
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sentiment-row strong {
+  color: var(--text);
+}
+
+.news-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+/* --- 차트 --- */
+.chart-view {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+}
+
+.chart-view img {
+  border-radius: 8px;
+}
+
+.chart-status {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.chart-status.error {
+  color: var(--sell);
+}
+
+/* --- 넓은 화면 --- */
+@media (min-width: 640px) {
+  .ticker-form {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .field {
+    flex: 1;
+  }
+
+  .ticker-form button {
+    flex: 0 0 auto;
+    padding: 10px 24px;
+  }
+
+  .result-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .indicators-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .signals-row {
+    flex-direction: row;
+  }
+
+  .signals-box {
+    flex: 1;
+  }
+}
