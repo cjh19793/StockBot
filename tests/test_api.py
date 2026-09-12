@@ -47,7 +47,8 @@ def mock_analysis(df=_DEFAULT):
         df = _fake_df()
 
     def fake_get_df(t, mode="기본"):
-        return None if df is None else df.copy()
+        d = df(t) if callable(df) else df   # 티커별로 다른 결과가 필요하면 callable 전달
+        return None if d is None else d.copy()
 
     patches = [
         mock.patch.object(engine, "get_df", fake_get_df),
@@ -144,6 +145,69 @@ def test_analyze_ticker_not_found():
     with mock_analysis(df=None):
         r = client.get("/api/analyze/ZZZZ")
     assert r.status_code == 404, r.text
+
+
+def test_compare_ok():
+    with mock_analysis():
+        r = client.get("/api/compare", params={"tickers": "AAPL,MSFT"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["mode"] == "기본"
+    assert body["errors"] == []
+    assert {res["ticker"] for res in body["results"]} == {"AAPL", "MSFT"}
+    for res in body["results"]:
+        assert 0 <= res["composite"]["total"] <= 100  # P3 종합점수 포함 확인
+
+
+def test_compare_mode_alias_applies_to_all():
+    with mock_analysis():
+        r = client.get("/api/compare", params={"tickers": "AAPL,MSFT", "mode": "5m"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["mode"] == "단타"
+    assert all(res["mode"] == "단타" for res in body["results"])
+
+
+def test_compare_dedupes_tickers():
+    with mock_analysis():
+        r = client.get("/api/compare", params={"tickers": "AAPL,AAPL,MSFT"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["results"]) == 2
+
+
+def test_compare_invalid_ticker_format_is_per_item_error():
+    with mock_analysis():
+        r = client.get("/api/compare", params={"tickers": "AAPL,not_a_ticker!!"})
+    assert r.status_code == 200, r.text   # 전체 요청은 죽지 않음
+    body = r.json()
+    assert len(body["results"]) == 1 and body["results"][0]["ticker"] == "AAPL"
+    assert len(body["errors"]) == 1
+    assert body["errors"][0]["ticker"] == "NOT_A_TICKER!!"
+    assert body["errors"][0]["status_code"] == 422
+
+
+def test_compare_ticker_not_found_is_per_item_error_not_whole_request():
+    def df_for(ticker):
+        return None if ticker == "ZZZZ" else _fake_df()
+
+    with mock_analysis(df=df_for):
+        r = client.get("/api/compare", params={"tickers": "AAPL,ZZZZ"})
+    assert r.status_code == 200, r.text   # 한 종목 실패가 전체 요청을 죽이지 않음
+    body = r.json()
+    assert len(body["results"]) == 1 and body["results"][0]["ticker"] == "AAPL"
+    assert len(body["errors"]) == 1
+    assert body["errors"][0]["ticker"] == "ZZZZ"
+    assert body["errors"][0]["status_code"] == 404
+
+
+def test_compare_rejects_too_few_or_too_many_tickers():
+    r = client.get("/api/compare", params={"tickers": "AAPL"})
+    assert r.status_code == 422, r.text
+
+    too_many = ",".join(f"T{i}" for i in range(11))
+    r = client.get("/api/compare", params={"tickers": too_many})
+    assert r.status_code == 422, r.text
 
 
 def test_chart_png():

@@ -78,6 +78,18 @@ class AnalysisResponse(BaseModel):
     market_regime: MarketRegimeResponse | None = None
 
 
+class CompareItemError(BaseModel):
+    ticker: str
+    error: str
+    status_code: int
+
+
+class CompareResponse(BaseModel):
+    mode: str
+    results: list[AnalysisResponse]
+    errors: list[CompareItemError]
+
+
 class MonteCarloHoldResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

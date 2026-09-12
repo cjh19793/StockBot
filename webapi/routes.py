@@ -5,6 +5,7 @@
 이벤트 루프를 블로킹하지 않는다 — 전체를 async 로 재작성하지 않는다.
 """
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, HTTPException, Path, Query
 from fastapi.responses import Response
@@ -12,10 +13,19 @@ from fastapi.responses import Response
 from charts import build_chart
 from config import CACHE_TTL_CHART, MC_CONFIG, MODE_ALIASES, MODE_CONFIG
 from engine import run_analysis
+from errors import AnalysisError, TickerNotFound, UpstreamDataError
 from montecarlo import run_montecarlo
 from util import ttl_cache
 from validation import is_valid_ticker, resolve_mode
 from webapi import schemas
+
+# webapi.main 의 exception_handler 매핑과 동일 — /api/compare 는 예외를 던지는 대신
+# 이 상태코드를 개별 결과 항목에 담아 반환한다 (한 종목 실패가 전체 요청을 죽이지 않도록).
+_COMPARE_ERROR_STATUS = {
+    TickerNotFound: 404,
+    UpstreamDataError: 502,
+}
+_MAX_COMPARE_TICKERS = 10
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -102,6 +112,59 @@ def analyze(
     m = _resolve_mode_param(mode, MODE_CONFIG)
     result = run_analysis(t, m)  # TickerNotFound / UpstreamDataError → 예외 핸들러
     return schemas.AnalysisResponse.model_validate(result)
+
+
+def _run_one_for_compare(ticker: str, mode: str):
+    """run_analysis 를 감싸 예외를 밖으로 던지지 않고 (성공, 실패) 튜플로 반환.
+
+    /api/analyze 의 예외→HTTP상태 매핑(webapi.main)과 동일한 상태코드를 쓰되,
+    여기서는 예외를 던지는 대신 개별 CompareItemError 로 담아 다른 티커 처리를
+    막지 않는다.
+    """
+    try:
+        result = run_analysis(ticker, mode)
+        return schemas.AnalysisResponse.model_validate(result), None
+    except AnalysisError as exc:
+        status = _COMPARE_ERROR_STATUS.get(type(exc), 500)
+        return None, schemas.CompareItemError(ticker=ticker, error=str(exc), status_code=status)
+    except Exception:
+        log.exception("종목 비교 중 분석 실패 (%s)", ticker)
+        return None, schemas.CompareItemError(
+            ticker=ticker, error="분석 처리 중 오류가 발생했습니다.", status_code=500,
+        )
+
+
+@router.get("/api/compare", response_model=schemas.CompareResponse, tags=["analysis"])
+def compare(
+    tickers: str = Query(..., description="콤마로 구분된 티커 목록 (예: AAPL,MSFT,GOOGL), 2~10개"),
+    mode: str | None = Query(None, description="분석 모드 (analyze 와 동일, 전체 티커 공통 적용)"),
+):
+    raw = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    seen = list(dict.fromkeys(raw))  # 순서 유지하며 중복 제거
+    if not (2 <= len(seen) <= _MAX_COMPARE_TICKERS):
+        raise HTTPException(
+            status_code=422,
+            detail=f"비교할 티커는 콤마로 구분해 2~{_MAX_COMPARE_TICKERS}개 지정해야 합니다.",
+        )
+
+    m = _resolve_mode_param(mode, MODE_CONFIG)
+
+    valid_tickers, errors = [], []
+    for t in seen:
+        if is_valid_ticker(t):
+            valid_tickers.append(t)
+        else:
+            errors.append(schemas.CompareItemError(
+                ticker=t, error=f"올바르지 않은 티커 형식: {t!r}", status_code=422,
+            ))
+
+    results = []
+    if valid_tickers:
+        with ThreadPoolExecutor(max_workers=min(len(valid_tickers), _MAX_COMPARE_TICKERS)) as ex:
+            for res, err in ex.map(lambda t: _run_one_for_compare(t, m), valid_tickers):
+                (results if res is not None else errors).append(res if res is not None else err)
+
+    return schemas.CompareResponse(mode=m, results=results, errors=errors)
 
 
 @router.get("/api/chart/{ticker}.png", tags=["analysis"])
