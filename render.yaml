@@ -1,19 +1,21 @@
-# Render Blueprint — StockBot FastAPI 웹 서비스만 배포 (무료 Free 플랜).
-# 텔레그램 봇(worker)은 여기 포함하지 않는다 — Render Free 는 별도 worker 무료 티어가 없어
-# 기존 실행 환경(예: Railway)에서 그대로 유지한다.
+# Render 배포 안내 (Blueprint 로는 더 이상 서비스를 관리하지 않음).
+#
+# 최종 사용자용 URL은 stockbot-api-ni3d.onrender.com 하나로 통일했다. 이 서비스는
+# 이 Blueprint 밖에서 수동으로 만든 일반 Web Service이며 설정은 아래와 동일하다:
+#   runtime: python / plan: free / branch: refactor/modular-structure
+#   buildCommand: pip install -r requirements.txt
+#   startCommand: uvicorn webapi.main:app --host 0.0.0.0 --port $PORT
+#   env: CORS_ORIGINS=*
+#
+# 과거엔 이 파일이 "stockbot" 이라는 이름의 Blueprint-managed 서비스를 별도로
+# 정의했었다 (stockbot-api 와 동일한 코드/브랜치를 실행하는 중복 배포였음).
+# stockbot-api 하나만으로 Web UI(프론트 정적 서빙, webapi/main.py 참고) + API가
+# 전부 동작함을 확인하고 그 중복 서비스를 정리했다. services 를 비워둔 이유는
+# 이 Blueprint가 더 이상 어떤 서비스도 소유/재생성하지 않게 하기 위함 — 서비스
+# 정의를 남겨두면 다음 Blueprint sync 때 삭제한 서비스가 되살아난다.
 #
 # 프론트엔드(React/Vite)는 별도 서비스로 만들지 않고 같은 서비스에서 정적으로
 # 서빙한다 (webapi/main.py 가 frontend/dist 를 마운트) — 새 무료 리소스를 늘리지
 # 않기 위함. 이 빌드 환경엔 Node 가 없으므로 frontend/dist 는 미리 빌드해 커밋한
 # 상태로 배포한다 (frontend/ 에서 `npm run build` 후 커밋).
-services:
-  - name: stockbot
-    type: web
-    runtime: python
-    plan: free
-    branch: refactor/modular-structure
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn webapi.main:app --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: CORS_ORIGINS
-        value: "*"
+services: []
