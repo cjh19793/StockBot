@@ -19,6 +19,17 @@ class MarketRegimeResponse(BaseModel):
     vix_level: str
 
 
+class CompositeScoreResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    total: int
+    label: str
+    technical: int
+    market: int
+    risk: int
+    market_available: bool
+
+
 class AnalysisResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -57,6 +68,7 @@ class AnalysisResponse(BaseModel):
     sell_signals: list[str]
     judgment: str
     chart_title: str
+    composite: CompositeScoreResponse
 
     fear_greed_score: int | None
     fear_greed_label: str | None

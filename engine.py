@@ -17,7 +17,8 @@ from indicators import calc_indicators, get_value
 from market import (get_earnings_date, get_fear_greed, get_market_regime,
                     get_market_status, get_news_sentiment)
 from models import AnalysisResult
-from risk import compute_target_stop
+from risk import compute_risk_score, compute_target_stop
+from scoring import compute_composite_score
 from signals import detect_signal, final_judgment
 
 log = logging.getLogger(__name__)
@@ -72,6 +73,9 @@ def run_analysis(ticker: str, mode: str = "기본") -> AnalysisResult:
     buy_score, buy_signals, sell_score, sell_signals = detect_signal(df)
     judgment, _, chart_title = final_judgment(buy_score, sell_score)
 
+    risk_score = compute_risk_score(stop_pct, stop_loss, support, curr)
+    composite = compute_composite_score(buy_score, sell_score, regime, risk_score)
+
     return AnalysisResult(
         ticker=ticker,
         mode=mode,
@@ -105,6 +109,7 @@ def run_analysis(ticker: str, mode: str = "기본") -> AnalysisResult:
         sell_signals=list(sell_signals),
         judgment=judgment,
         chart_title=chart_title,
+        composite=composite,
         fear_greed_score=fg_score,
         fear_greed_label=fg_label,
         earnings=earnings,

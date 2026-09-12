@@ -117,6 +117,9 @@ def test_analyze_ok():
     assert body["judgment"]
     assert body["market_regime"]["label"] == "상승장"
     assert body["market_regime"]["score"] == 72
+    assert 0 <= body["composite"]["total"] <= 100
+    assert body["composite"]["label"] in {"Strong Buy", "Buy", "Neutral", "Sell", "Strong Sell"}
+    assert body["composite"]["market_available"] is True   # market_regime 목킹돼 있으므로
 
 
 def test_analyze_mode_alias():

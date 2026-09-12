@@ -52,6 +52,25 @@ MODE_STOP_ATR_MULT = {"단타": 1.0, "스윙": 1.5, "기본": 1.5}
 TARGET_PCT_BOUNDS = (0.02, 0.15)
 STOP_PCT_BOUNDS = (0.01, 0.08)
 
+# 종합점수(0~100) — signals.detect_signal() 실측 최대점수로 정규화.
+# 매수/매도 조건이 비대칭(매도쪽 거래량 조건에 elif 완화단계가 없음)이라
+# BUY_SCORE_MAX(10) != SELL_SCORE_MAX(9). 두 지표를 늘리거나 배점을 바꾸면
+# 이 값도 함께 갱신해야 한다 (signals.py 변경 시 재확인 필요).
+BUY_SCORE_MAX = 10
+SELL_SCORE_MAX = 9
+
+# 기술/시장환경/리스크 가중합. 합이 1.0. 백테스트(P8)에서 재실험할 수 있도록 상수로 분리.
+COMPOSITE_WEIGHTS = {"technical": 0.5, "market": 0.25, "risk": 0.25}
+
+# 종합점수 → 라벨. 내림차순으로 첫 매치 사용.
+COMPOSITE_BANDS = [
+    (70, "Strong Buy"),
+    (55, "Buy"),
+    (45, "Neutral"),
+    (30, "Sell"),
+    (0, "Strong Sell"),
+]
+
 # 조회 결과 TTL 캐시 (초)
 CACHE_TTL_OHLC = 90
 CACHE_TTL_REALTIME = 30

@@ -19,6 +19,18 @@ class MarketRegime:
 
 
 @dataclass
+class CompositeScore:
+    """기술/시장환경/리스크를 가중합한 종합점수 (0~100)."""
+
+    total: int          # 0~100
+    label: str          # "Strong Buy" / "Buy" / "Neutral" / "Sell" / "Strong Sell"
+    technical: int       # 0~100, signals.detect_signal() 매핑
+    market: int           # 0~100, market_regime.score 또는 중립(50) 폴백
+    risk: int              # 0~100, 높을수록 안전(낮은 리스크)
+    market_available: bool  # market_regime 조회 성공 여부 (실패 시 market=50 폴백 사용)
+
+
+@dataclass
 class AnalysisResult:
     """단일 티커/모드 분석 결과."""
 
@@ -60,8 +72,9 @@ class AnalysisResult:
     sell_score: int
     buy_signals: list[str]
     sell_signals: list[str]
-    judgment: str                  # final_judgment 라벨, 예: "[Buy] Weak Buy"
+    judgment: str                  # final_judgment 라벨, 예: "[Buy] Weak Buy" (변경 없음)
     chart_title: str
+    composite: CompositeScore      # 종합점수 — judgment 와 별개의 신규 지표
 
     # 시장 심리
     fear_greed_score: int | None

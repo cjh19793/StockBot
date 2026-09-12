@@ -11,11 +11,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config import MC_CONFIG, MODE_CONFIG  # noqa: E402
 from indicators import calc_indicators, get_value  # noqa: E402
 from market import _score_regime, _trend_score, _vix_score  # noqa: E402
-from models import (AnalysisResult, MonteCarloHold,  # noqa: E402
-                    MonteCarloResult)
+from models import (AnalysisResult, CompositeScore,  # noqa: E402
+                    MarketRegime, MonteCarloHold, MonteCarloResult)
 from report_format import (format_analysis_report,  # noqa: E402
                            format_montecarlo)
-from risk import compute_target_stop  # noqa: E402
+from risk import compute_risk_score, compute_target_stop  # noqa: E402
+from scoring import (_market_subscore, _technical_subscore,  # noqa: E402
+                     compute_composite_score)
 from signals import detect_signal, final_judgment  # noqa: E402
 from validation import is_valid_ticker, resolve_mode  # noqa: E402
 
@@ -185,6 +187,77 @@ def test_compute_target_stop_unknown_mode_falls_back_to_default():
     assert a == b
 
 
+def test_compute_risk_score_stop_below_support_is_safest():
+    # 손절가가 지지선보다 아래 → 구조 여유 만점, 낮은 변동성이면 전체도 높음
+    score = compute_risk_score(stop_pct=0.01, stop_loss=90.0, support=95.0, price=100.0)
+    assert score == 100
+
+
+def test_compute_risk_score_stop_above_support_penalized():
+    safe = compute_risk_score(stop_pct=0.03, stop_loss=97.0, support=95.0, price=100.0)
+    risky = compute_risk_score(stop_pct=0.03, stop_loss=99.0, support=95.0, price=100.0)
+    # 손절가가 지지선보다 위이면서 현재가에 더 가까울수록(=지지선 여유가 적을수록) 더 위험
+    assert risky < safe
+
+
+def test_compute_risk_score_high_stop_pct_lowers_score():
+    low_vol = compute_risk_score(stop_pct=0.01, stop_loss=90.0, support=80.0, price=100.0)
+    high_vol = compute_risk_score(stop_pct=0.08, stop_loss=90.0, support=80.0, price=100.0)
+    assert high_vol < low_vol
+
+
+def test_compute_risk_score_invalid_inputs_fallback_neutral():
+    assert compute_risk_score(float("nan"), 90.0, 95.0, 100.0) == 50
+    assert compute_risk_score(0.03, 90.0, float("nan"), 100.0) == 50
+    assert compute_risk_score(0.03, 90.0, 95.0, None) == 50
+    assert compute_risk_score(0.03, 90.0, 95.0, 0) == 50   # price<=0 방어
+
+
+def test_compute_risk_score_price_at_or_below_support_no_crash():
+    # stop_loss > support 인데 price<=support 인 이상 케이스 — 구조 비율 계산 불가 시
+    # 예외 없이 유효 범위(0~100) 값으로 폴백해야 함 (정확히 50이라고 가정하지 않음).
+    score = compute_risk_score(stop_pct=0.03, stop_loss=105.0, support=100.0, price=100.0)
+    assert 0 <= score <= 100
+
+
+def test_technical_subscore_uses_asymmetric_max():
+    # signals.detect_signal() 실측: buy 최대 10, sell 최대 9 (비대칭)
+    assert _technical_subscore(0, 0) == 50
+    assert _technical_subscore(10, 0) == 100   # 매수 만점 → 상한
+    assert _technical_subscore(0, 9) == 0      # 매도 만점 → 하한
+    assert _technical_subscore(5, 0) == 75     # 50 + 50*(5/10)
+
+
+def test_market_subscore_none_fallback():
+    assert _market_subscore(None) == (50, False)
+    regime = MarketRegime(label="상승장", score=80, sp500_trend="", nasdaq_trend="", vix=14.0, vix_level="낮음")
+    assert _market_subscore(regime) == (80, True)
+
+
+def test_compute_composite_score_neutral_and_extremes():
+    neutral = compute_composite_score(0, 0, None, 50)
+    assert neutral.total == 50
+    assert neutral.label == "Neutral"
+    assert neutral.market_available is False
+
+    bullish_regime = MarketRegime(label="상승장", score=90, sp500_trend="", nasdaq_trend="", vix=12.0, vix_level="낮음")
+    strong = compute_composite_score(10, 0, bullish_regime, 90)
+    assert strong.total == round(100 * 0.5 + 90 * 0.25 + 90 * 0.25)
+    assert strong.label == "Strong Buy"
+    assert strong.market_available is True
+
+    bearish_regime = MarketRegime(label="하락장", score=10, sp500_trend="", nasdaq_trend="", vix=35.0, vix_level="공포")
+    weak = compute_composite_score(0, 9, bearish_regime, 10)
+    assert weak.total == round(0 * 0.5 + 10 * 0.25 + 10 * 0.25)
+    assert weak.label == "Strong Sell"
+
+
+def test_analysis_result_has_composite_field():
+    r = _sample_result()
+    assert isinstance(r.composite, CompositeScore)
+    assert 0 <= r.composite.total <= 100
+
+
 def test_validation_ticker_and_mode():
     assert is_valid_ticker("AAPL")
     assert is_valid_ticker("BRK-B")
@@ -216,6 +289,7 @@ def _sample_result(**over):
         buy_score=3, sell_score=0,
         buy_signals=["MACD 골든크로스 - 상승 전환 신호"], sell_signals=[],
         judgment="[Buy] Weak Buy", chart_title="[Buy] Weak Buy",
+        composite=CompositeScore(total=65, label="Buy", technical=75, market=60, risk=55, market_available=True),
         fear_greed_score=40, fear_greed_label="공포 - 매수 고려",
         earnings="실적 발표: 2025-02-01 (17일 후)",
         news_sentiment="긍정 (3건)", news_titles=["AAPL surges"],
