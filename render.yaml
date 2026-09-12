@@ -1,0 +1,14 @@
+# Render Blueprint — StockBot FastAPI 웹 서비스만 배포 (무료 Free 플랜).
+# 텔레그램 봇(worker)은 여기 포함하지 않는다 — Render Free 는 별도 worker 무료 티어가 없어
+# 기존 실행 환경(예: Railway)에서 그대로 유지한다.
+services:
+  - name: stockbot-api
+    type: web
+    runtime: python
+    plan: free
+    branch: refactor/modular-structure
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn webapi.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CORS_ORIGINS
+        value: "*"
