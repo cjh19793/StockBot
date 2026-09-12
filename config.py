@@ -44,9 +44,13 @@ MODE_ALIASES = {
     "장기": "장기", "LONG": "장기",
 }
 
-# 매매 파라미터
-TARGET_PCT = 0.05   # 목표가 +5%
-STOP_PCT = 0.03     # 손절가 -3%
+# 매매 파라미터 — 목표가/손절가는 고정 %가 아니라 ATR(변동성) 기반으로 계산한다.
+# 모드별 ATR 배수: 짧은 호흡일수록 배수를 좁게.
+MODE_TARGET_ATR_MULT = {"단타": 1.5, "스윙": 2.5, "기본": 3.0}
+MODE_STOP_ATR_MULT = {"단타": 1.0, "스윙": 1.5, "기본": 1.5}
+# 위 배수 적용 후 비상식적인 값이 나오지 않도록 클램프 (min, max)
+TARGET_PCT_BOUNDS = (0.02, 0.15)
+STOP_PCT_BOUNDS = (0.01, 0.08)
 
 # 조회 결과 TTL 캐시 (초)
 CACHE_TTL_OHLC = 90

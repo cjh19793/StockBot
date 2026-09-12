@@ -7,6 +7,18 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class MarketRegime:
+    """시장 전체 상황 (S&P500/NASDAQ 추세 + VIX 변동성 기반)."""
+
+    label: str          # "상승장" / "횡보장" / "하락장"
+    score: int          # 0~100 (높을수록 우호적)
+    sp500_trend: str    # 사람이 읽는 설명, 예: "강한 상승 (20일 +3.2%)"
+    nasdaq_trend: str
+    vix: float
+    vix_level: str      # "낮음" / "보통" / "경계" / "공포"
+
+
+@dataclass
 class AnalysisResult:
     """단일 티커/모드 분석 결과."""
 
@@ -37,6 +49,10 @@ class AnalysisResult:
     ma20: float
     bb_upper: float
     bb_lower: float
+    atr: float
+    atr_pct: float
+    support: float
+    resistance: float
     volume: float
 
     # 신호 / 판정
@@ -53,6 +69,7 @@ class AnalysisResult:
     earnings: str | None
     news_sentiment: str | None
     news_titles: list[str]
+    market_regime: MarketRegime | None = None
 
     # 차트 렌더링용 지표 포함 DataFrame (직렬화 대상 아님)
     df: object = field(default=None, repr=False)

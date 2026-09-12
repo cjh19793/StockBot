@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import engine  # noqa: E402
 import montecarlo as mc  # noqa: E402
+from models import MarketRegime  # noqa: E402
 from webapi.main import app  # noqa: E402
 
 client = TestClient(app)
@@ -55,6 +56,10 @@ def mock_analysis(df=_DEFAULT):
         mock.patch.object(engine, "get_fear_greed", lambda: (40, "공포 - 매수 고려")),
         mock.patch.object(engine, "get_news_sentiment", lambda t: ("긍정 (2건)", ["AAPL up", "AAPL beats"])),
         mock.patch.object(engine, "get_earnings_date", lambda t: "실적 발표: 2025-02-01 (17일 후)"),
+        mock.patch.object(engine, "get_market_regime", lambda: MarketRegime(
+            label="상승장", score=72, sp500_trend="강한 상승 (20일 +2.1%)",
+            nasdaq_trend="강한 상승 (20일 +3.0%)", vix=14.5, vix_level="낮음",
+        )),
     ]
     for p in patches:
         p.start()
@@ -110,6 +115,8 @@ def test_analyze_ok():
     assert isinstance(body["buy_signals"], list)
     assert isinstance(body["news_titles"], list)
     assert body["judgment"]
+    assert body["market_regime"]["label"] == "상승장"
+    assert body["market_regime"]["score"] == 72
 
 
 def test_analyze_mode_alias():

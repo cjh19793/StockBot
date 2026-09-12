@@ -8,6 +8,17 @@ models.AnalysisResult / MonteCarloResult 를 그대로 미러링한다.
 from pydantic import BaseModel, ConfigDict
 
 
+class MarketRegimeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    label: str
+    score: int
+    sp500_trend: str
+    nasdaq_trend: str
+    vix: float
+    vix_level: str
+
+
 class AnalysisResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -34,6 +45,10 @@ class AnalysisResponse(BaseModel):
     ma20: float
     bb_upper: float
     bb_lower: float
+    atr: float
+    atr_pct: float
+    support: float
+    resistance: float
     volume: float
 
     buy_score: int
@@ -48,6 +63,7 @@ class AnalysisResponse(BaseModel):
     earnings: str | None
     news_sentiment: str | None
     news_titles: list[str]
+    market_regime: MarketRegimeResponse | None = None
 
 
 class MonteCarloHoldResponse(BaseModel):

@@ -44,4 +44,20 @@ def calc_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["Stoch_K"] = 100 * (df["Close"] - low14) / rng
     df["Stoch_D"] = df["Stoch_K"].rolling(3).mean()
 
+    # ATR(14) — True Range 는 갭까지 포함한 실질 변동폭. RSI 와 동일한 14봉 창 사용.
+    # 첫 행은 전일 종가가 없어 TR 자체가 NaN이며, 이후 컬럼들과 동일하게
+    # rolling(14) 결과도 초반 구간은 자연스럽게 NaN으로 남긴다 (별도 보정 없음).
+    prev_close = df["Close"].shift(1)
+    true_range = pd.concat([
+        df["High"] - df["Low"],
+        (df["High"] - prev_close).abs(),
+        (df["Low"] - prev_close).abs(),
+    ], axis=1).max(axis=1)
+    df["ATR"] = true_range.rolling(14).mean()
+    df["ATR_Pct"] = df["ATR"] / df["Close"]
+
+    # 지지/저항 — 최근 20봉 실제 저가/고가 (볼린저와 달리 통계 밴드가 아닌 가격구조 기준)
+    df["Support"] = df["Low"].rolling(20).min()
+    df["Resistance"] = df["High"].rolling(20).max()
+
     return df

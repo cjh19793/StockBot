@@ -5,17 +5,19 @@
 """
 import datetime
 import logging
+import math
 from concurrent.futures import ThreadPoolExecutor
 
 import pytz
 
-from config import MODE_CONFIG, STOP_PCT, TARGET_PCT
+from config import MODE_CONFIG
 from data import get_df, get_realtime_price
 from errors import TickerNotFound
 from indicators import calc_indicators, get_value
-from market import (get_earnings_date, get_fear_greed, get_market_status,
-                    get_news_sentiment)
+from market import (get_earnings_date, get_fear_greed, get_market_regime,
+                    get_market_status, get_news_sentiment)
 from models import AnalysisResult
+from risk import compute_target_stop
 from signals import detect_signal, final_judgment
 
 log = logging.getLogger(__name__)
@@ -36,16 +38,18 @@ def run_analysis(ticker: str, mode: str = "기본") -> AnalysisResult:
     df = calc_indicators(df)
 
     # 부가 정보는 각각 네트워크 I/O — 병렬로 조회
-    with ThreadPoolExecutor(max_workers=4) as ex:
+    with ThreadPoolExecutor(max_workers=5) as ex:
         f_realtime = ex.submit(get_realtime_price, ticker)
         f_fg = ex.submit(get_fear_greed)
         f_news = ex.submit(get_news_sentiment, ticker)
         f_earnings = ex.submit(get_earnings_date, ticker)
+        f_regime = ex.submit(get_market_regime)
         market, is_open = get_market_status()
         realtime = f_realtime.result()
         fg_score, fg_label = f_fg.result()
         sentiment, news_titles = f_news.result()
         earnings = f_earnings.result()
+        regime = f_regime.result()
 
     if is_open and realtime:
         curr = realtime
@@ -56,8 +60,14 @@ def run_analysis(ticker: str, mode: str = "기본") -> AnalysisResult:
 
     now_str = df.index[-1].strftime("%Y-%m-%d") if mode == "기본" else str(df.index[-1])[:16]
     kt_str = datetime.datetime.now(_KST).strftime("%Y-%m-%d %H:%M (KST)")
-    target_price = curr * (1 + TARGET_PCT)
-    stop_loss = curr * (1 - STOP_PCT)
+
+    atr = get_value(df["ATR"])
+    support = get_value(df["Support"])
+    resistance = get_value(df["Resistance"])
+    # curr(실시간가/전일종가) 기준 변동성 비율. ATR 이 NaN(데이터 부족)이면 0으로
+    # 폴백해 클램프 하한(TARGET_PCT_BOUNDS/STOP_PCT_BOUNDS 최소값)이 적용되게 한다.
+    atr_pct = 0.0 if (not curr or math.isnan(atr)) else atr / curr
+    target_price, stop_loss, target_pct, stop_pct = compute_target_stop(curr, atr_pct, mode)
 
     buy_score, buy_signals, sell_score, sell_signals = detect_signal(df)
     judgment, _, chart_title = final_judgment(buy_score, sell_score)
@@ -75,8 +85,8 @@ def run_analysis(ticker: str, mode: str = "기본") -> AnalysisResult:
         price_is_realtime=price_is_realtime,
         target_price=target_price,
         stop_loss=stop_loss,
-        target_pct=TARGET_PCT,
-        stop_pct=STOP_PCT,
+        target_pct=target_pct,
+        stop_pct=stop_pct,
         rsi=get_value(df["RSI"]),
         macd=get_value(df["MACD"]),
         stoch_k=get_value(df["Stoch_K"]),
@@ -84,6 +94,10 @@ def run_analysis(ticker: str, mode: str = "기본") -> AnalysisResult:
         ma20=get_value(df["MA20"]),
         bb_upper=get_value(df["Upper"]),
         bb_lower=get_value(df["Lower"]),
+        atr=atr,
+        atr_pct=atr_pct,
+        support=support,
+        resistance=resistance,
         volume=get_value(df["Volume"]),
         buy_score=buy_score,
         sell_score=sell_score,
@@ -96,5 +110,6 @@ def run_analysis(ticker: str, mode: str = "기본") -> AnalysisResult:
         earnings=earnings,
         news_sentiment=sentiment,
         news_titles=list(news_titles),
+        market_regime=regime,
         df=df,
     )
