@@ -2,7 +2,7 @@
 # 텔레그램 봇(worker)은 여기 포함하지 않는다 — Render Free 는 별도 worker 무료 티어가 없어
 # 기존 실행 환경(예: Railway)에서 그대로 유지한다.
 services:
-  - name: stockbot-api
+  - name: stockbot
     type: web
     runtime: python
     plan: free
