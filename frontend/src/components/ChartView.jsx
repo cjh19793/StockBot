@@ -6,8 +6,21 @@ export default function ChartView({ src, alt }) {
 
   return (
     <div className="chart-view">
-      {!loaded && !failed && <p className="chart-status">차트 불러오는 중...</p>}
-      {failed && <p className="chart-status error">차트를 불러오지 못했습니다.</p>}
+      {!loaded && (
+        <div className="chart-placeholder">
+          {failed ? (
+            <span className="t1" style={{ color: "var(--negative)" }}>차트를 불러오지 못했습니다</span>
+          ) : (
+            <>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M3 3v18h18" />
+                <path d="M7 14l3-3 3 3 5-6" />
+              </svg>
+              <span className="t1">차트 불러오는 중...</span>
+            </>
+          )}
+        </div>
+      )}
       <img
         key={src}
         src={src}

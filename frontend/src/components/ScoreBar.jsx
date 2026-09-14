@@ -2,13 +2,13 @@
 export default function ScoreBar({ label, value }) {
   const pct = Math.max(0, Math.min(100, value));
   return (
-    <div className="score-bar">
-      <div className="score-bar-head">
+    <div className="bar-row">
+      <div className="bar-head">
         <span>{label}</span>
-        <span>{value}</span>
+        <b>{value}</b>
       </div>
-      <div className="score-bar-track">
-        <div className="score-bar-fill" style={{ width: `${pct}%` }} />
+      <div className="bar-track">
+        <div className="bar-fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

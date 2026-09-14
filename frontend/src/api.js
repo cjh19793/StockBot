@@ -41,3 +41,12 @@ export async function fetchCompare(tickers, mode) {
   if (!res.ok) throw new Error(await readErrorMessage(res));
   return res.json();
 }
+
+export async function fetchMonteCarlo(ticker, mode, simulations) {
+  const url = new URL(`${API_BASE}/api/montecarlo/${encodeURIComponent(ticker)}`);
+  if (mode) url.searchParams.set("mode", mode);
+  if (simulations) url.searchParams.set("simulations", String(simulations));
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  return res.json();
+}

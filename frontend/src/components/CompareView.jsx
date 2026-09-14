@@ -45,29 +45,44 @@ export default function CompareView({ modes }) {
   }
 
   return (
-    <section className="compare-view">
-      <form className="compare-form" onSubmit={handleSubmit}>
-        <div className="field field-grow">
+    <section className="view-stack">
+      <form className="search-card" onSubmit={handleSubmit}>
+        <div className="field" style={{ flex: 2 }}>
           <label htmlFor="compare-tickers">비교할 티커 (콤마로 구분, 2~10개)</label>
-          <input
-            id="compare-tickers"
-            type="text"
-            autoCapitalize="characters"
-            autoComplete="off"
-            placeholder="예: AAPL,MSFT,GOOGL"
-            value={tickersInput}
-            onChange={(e) => setTickersInput(e.target.value)}
-          />
+          <div className="input">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              id="compare-tickers"
+              type="text"
+              autoCapitalize="characters"
+              autoComplete="off"
+              placeholder="예: AAPL,MSFT,GOOGL"
+              value={tickersInput}
+              onChange={(e) => setTickersInput(e.target.value)}
+            />
+          </div>
         </div>
         <div className="field">
           <label htmlFor="compare-mode">분석 모드</label>
-          <select id="compare-mode" value={mode} onChange={(e) => setMode(e.target.value)}>
+          <div className="segmented" role="radiogroup" aria-label="분석 모드">
             {modeOptions.map((m) => (
-              <option key={m.name} value={m.name}>{m.name} ({m.label})</option>
+              <button
+                type="button"
+                key={m.name}
+                role="radio"
+                aria-checked={mode === m.name}
+                className={`seg ${mode === m.name ? "active" : ""}`}
+                onClick={() => setMode(m.name)}
+              >
+                {m.name}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
-        <button type="submit" disabled={loading || !tickersInput.trim()}>
+        <button type="submit" className="btn-primary" disabled={loading || !tickersInput.trim()}>
           {loading ? "비교 중..." : "비교하기"}
         </button>
       </form>
@@ -82,6 +97,10 @@ export default function CompareView({ modes }) {
 
       {data && (
         <>
+          <div className="page-title">
+            <h1>종목 비교 결과</h1>
+            <p>종합점수 기준 내림차순 정렬 · {data.results.length}개 종목</p>
+          </div>
           <CompareTable results={data.results} />
           <CompareErrors errors={data.errors} />
           {data.results.length === 0 && data.errors.length > 0 && (
