@@ -30,6 +30,13 @@ def _market_subscore(market_regime) -> tuple[int, bool]:
     return market_regime.score, True
 
 
+def _fundamentals_subscore(fundamentals) -> tuple[int, bool]:
+    """fundamentals.overall 또는 조회 실패 시 중립(50, 사용불가 플래그)."""
+    if fundamentals is None:
+        return 50, False
+    return fundamentals.overall, True
+
+
 def _label_for(total: int) -> str:
     for threshold, label in COMPOSITE_BANDS:
         if total >= threshold:
@@ -37,18 +44,24 @@ def _label_for(total: int) -> str:
     return COMPOSITE_BANDS[-1][1]
 
 
-def compute_composite_score(buy_score: int, sell_score: int, market_regime, risk_score: int) -> CompositeScore:
-    """기술(50%) + 시장환경(25%) + 리스크(25%) 가중합 → CompositeScore.
+def compute_composite_score(
+    buy_score: int, sell_score: int, market_regime, risk_score: int, fundamentals=None,
+) -> CompositeScore:
+    """기술(40%) + 시장환경(20%) + 리스크(20%) + 펀더멘털(20%) 가중합 → CompositeScore.
 
     risk_score 는 risk.compute_risk_score() 결과를 그대로 받는다 (이 함수는
-    리스크를 재계산하지 않음 — 중복 계산 방지).
+    리스크를 재계산하지 않음 — 중복 계산 방지). fundamentals 는 fundamentals.get_fundamentals()
+    결과(FundamentalsScore | None)를 그대로 받는다. 생략(None) 시 market_regime 과 동일하게
+    중립(50)으로 폴백한다.
     """
     technical = _technical_subscore(buy_score, sell_score)
     market, market_available = _market_subscore(market_regime)
+    fundamentals_score, fundamentals_available = _fundamentals_subscore(fundamentals)
 
     w = COMPOSITE_WEIGHTS
     total = int(round(_clamp(
-        technical * w["technical"] + market * w["market"] + risk_score * w["risk"],
+        technical * w["technical"] + market * w["market"] + risk_score * w["risk"]
+        + fundamentals_score * w["fundamentals"],
         0, 100,
     )))
 
@@ -59,4 +72,6 @@ def compute_composite_score(buy_score: int, sell_score: int, market_regime, risk
         market=market,
         risk=risk_score,
         market_available=market_available,
+        fundamentals=fundamentals_score,
+        fundamentals_available=fundamentals_available,
     )

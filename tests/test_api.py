@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import engine  # noqa: E402
 import montecarlo as mc  # noqa: E402
-from models import MarketRegime  # noqa: E402
+from models import FundamentalsScore, MarketRegime  # noqa: E402
 from webapi.main import app  # noqa: E402
 
 client = TestClient(app)
@@ -60,6 +60,9 @@ def mock_analysis(df=_DEFAULT):
         mock.patch.object(engine, "get_market_regime", lambda: MarketRegime(
             label="상승장", score=72, sp500_trend="강한 상승 (20일 +2.1%)",
             nasdaq_trend="강한 상승 (20일 +3.0%)", vix=14.5, vix_level="낮음",
+        )),
+        mock.patch.object(engine, "get_fundamentals", lambda t: FundamentalsScore(
+            overall=68, label="양호", growth=70, profitability=65, valuation=60, financial_health=75,
         )),
     ]
     for p in patches:
@@ -121,6 +124,21 @@ def test_analyze_ok():
     assert 0 <= body["composite"]["total"] <= 100
     assert body["composite"]["label"] in {"Strong Buy", "Buy", "Neutral", "Sell", "Strong Sell"}
     assert body["composite"]["market_available"] is True   # market_regime 목킹돼 있으므로
+    assert body["composite"]["fundamentals"] == 68          # get_fundamentals 목킹돼 있으므로
+    assert body["composite"]["fundamentals_available"] is True
+    assert body["fundamentals"]["label"] == "양호"
+    assert body["fundamentals"]["growth"] == 70
+
+
+def test_analyze_fundamentals_unavailable_falls_back_neutral():
+    with mock_analysis():
+        with mock.patch.object(engine, "get_fundamentals", lambda t: None):
+            r = client.get("/api/analyze/AAPL")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["fundamentals"] is None
+    assert body["composite"]["fundamentals"] == 50
+    assert body["composite"]["fundamentals_available"] is False
 
 
 def test_analyze_mode_alias():

@@ -23,6 +23,7 @@ export default function CompareTable({ results }) {
             <th>기술</th>
             <th>시장환경</th>
             <th>리스크</th>
+            <th>펀더멘털</th>
             <th>목표가</th>
             <th>손절가</th>
             <th>판정</th>
@@ -38,6 +39,7 @@ export default function CompareTable({ results }) {
               <td>{r.composite.technical}</td>
               <td>{r.composite.market}</td>
               <td>{r.composite.risk}</td>
+              <td>{r.composite.fundamentals}</td>
               <td>${fmt(r.target_price)}</td>
               <td>${fmt(r.stop_loss)}</td>
               <td>{r.judgment}</td>

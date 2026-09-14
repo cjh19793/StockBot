@@ -59,8 +59,10 @@ STOP_PCT_BOUNDS = (0.01, 0.08)
 BUY_SCORE_MAX = 10
 SELL_SCORE_MAX = 9
 
-# 기술/시장환경/리스크 가중합. 합이 1.0. 백테스트(P8)에서 재실험할 수 있도록 상수로 분리.
-COMPOSITE_WEIGHTS = {"technical": 0.5, "market": 0.25, "risk": 0.25}
+# 기술/시장환경/리스크/펀더멘털 가중합. 합이 1.0. 백테스트(P8)에서 재실험할 수 있도록 상수로 분리.
+# P5(펀더멘털) 추가 전 비율(기술:시장:리스크 = 2:1:1)을 그대로 유지한 채 20%p를 떼어
+# 펀더멘털에 배분 (0.5→0.4, 0.25→0.2, 0.25→0.2, 신규 0.2).
+COMPOSITE_WEIGHTS = {"technical": 0.4, "market": 0.2, "risk": 0.2, "fundamentals": 0.2}
 
 # 종합점수 → 라벨. 내림차순으로 첫 매치 사용.
 COMPOSITE_BANDS = [
@@ -78,6 +80,9 @@ CACHE_TTL_MARKET = 300
 CACHE_TTL_EARNINGS = 3600
 CACHE_TTL_MONTECARLO = 300  # 몬테카를로용 일봉 다운로드 (yfinance 과호출 방지)
 CACHE_TTL_CHART = 90        # 렌더링된 차트 PNG (요청마다 재렌더링 방지)
+# 펀더멘털(yf.Ticker.info)은 분기 실적 주기로만 바뀌므로 다른 조회보다 훨씬 길게 캐싱해
+# Render Free 티어에서 반복 조회로 인한 yfinance 과호출/레이트리밋을 피한다.
+CACHE_TTL_FUNDAMENTALS = 21600  # 6시간
 
 # 웹 API CORS 허용 도메인. 콤마로 구분된 목록, 기본값 "*"(전체 허용 — 로컬/초기 배포용).
 # 프론트 도메인이 정해지면 예: CORS_ORIGINS="https://stockbot.example.com,https://app.example.com"

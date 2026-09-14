@@ -19,6 +19,17 @@ class MarketRegimeResponse(BaseModel):
     vix_level: str
 
 
+class FundamentalsScoreResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    overall: int
+    label: str
+    growth: int | None
+    profitability: int | None
+    valuation: int | None
+    financial_health: int | None
+
+
 class CompositeScoreResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,6 +39,8 @@ class CompositeScoreResponse(BaseModel):
     market: int
     risk: int
     market_available: bool
+    fundamentals: int
+    fundamentals_available: bool
 
 
 class AnalysisResponse(BaseModel):
@@ -76,6 +89,7 @@ class AnalysisResponse(BaseModel):
     news_sentiment: str | None
     news_titles: list[str]
     market_regime: MarketRegimeResponse | None = None
+    fundamentals: FundamentalsScoreResponse | None = None
 
 
 class CompareItemError(BaseModel):

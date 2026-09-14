@@ -13,6 +13,7 @@ import pytz
 from config import MODE_CONFIG
 from data import get_df, get_realtime_price
 from errors import TickerNotFound
+from fundamentals import get_fundamentals
 from indicators import calc_indicators, get_value
 from market import (get_earnings_date, get_fear_greed, get_market_regime,
                     get_market_status, get_news_sentiment)
@@ -39,18 +40,20 @@ def run_analysis(ticker: str, mode: str = "기본") -> AnalysisResult:
     df = calc_indicators(df)
 
     # 부가 정보는 각각 네트워크 I/O — 병렬로 조회
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=6) as ex:
         f_realtime = ex.submit(get_realtime_price, ticker)
         f_fg = ex.submit(get_fear_greed)
         f_news = ex.submit(get_news_sentiment, ticker)
         f_earnings = ex.submit(get_earnings_date, ticker)
         f_regime = ex.submit(get_market_regime)
+        f_fundamentals = ex.submit(get_fundamentals, ticker)
         market, is_open = get_market_status()
         realtime = f_realtime.result()
         fg_score, fg_label = f_fg.result()
         sentiment, news_titles = f_news.result()
         earnings = f_earnings.result()
         regime = f_regime.result()
+        fundamentals = f_fundamentals.result()
 
     if is_open and realtime:
         curr = realtime
@@ -74,7 +77,7 @@ def run_analysis(ticker: str, mode: str = "기본") -> AnalysisResult:
     judgment, _, chart_title = final_judgment(buy_score, sell_score)
 
     risk_score = compute_risk_score(stop_pct, stop_loss, support, curr)
-    composite = compute_composite_score(buy_score, sell_score, regime, risk_score)
+    composite = compute_composite_score(buy_score, sell_score, regime, risk_score, fundamentals)
 
     return AnalysisResult(
         ticker=ticker,
@@ -116,5 +119,6 @@ def run_analysis(ticker: str, mode: str = "기본") -> AnalysisResult:
         news_sentiment=sentiment,
         news_titles=list(news_titles),
         market_regime=regime,
+        fundamentals=fundamentals,
         df=df,
     )

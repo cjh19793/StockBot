@@ -11,10 +11,19 @@ function judgmentTone(judgment) {
   return "tone-neutral";
 }
 
+function fundamentalsRow(label, value) {
+  return (
+    <p className="meta">
+      {label}: {typeof value === "number" ? `${value}점` : "데이터 없음"}
+    </p>
+  );
+}
+
 export default function AnalysisResult({ result }) {
   const r = result;
   const c = r.composite;
   const regime = r.market_regime;
+  const fundamentals = r.fundamentals;
 
   return (
     <section className="analysis-result">
@@ -37,10 +46,16 @@ export default function AnalysisResult({ result }) {
           <ScoreBar label="기술적 분석" value={c.technical} />
           <ScoreBar label="시장환경" value={c.market} />
           <ScoreBar label="리스크(높을수록 안전)" value={c.risk} />
+          <ScoreBar label="펀더멘털" value={c.fundamentals} />
         </div>
         {!c.market_available && (
           <p className="composite-note">
             시장환경 데이터를 가져오지 못해 중립값(50)으로 계산되었습니다.
+          </p>
+        )}
+        {!c.fundamentals_available && (
+          <p className="composite-note">
+            펀더멘털 데이터를 가져오지 못해 중립값(50)으로 계산되었습니다.
           </p>
         )}
       </div>
@@ -81,6 +96,16 @@ export default function AnalysisResult({ result }) {
           <p className="meta">S&amp;P500: {regime.sp500_trend}</p>
           <p className="meta">NASDAQ: {regime.nasdaq_trend}</p>
           <p className="meta">VIX: {fmt(regime.vix, 1)} ({regime.vix_level})</p>
+        </div>
+      )}
+
+      {fundamentals && (
+        <div className="regime-row">
+          <h3>펀더멘털 <span className="regime-label">{fundamentals.label} ({fundamentals.overall}점)</span></h3>
+          {fundamentalsRow("성장성", fundamentals.growth)}
+          {fundamentalsRow("수익성", fundamentals.profitability)}
+          {fundamentalsRow("밸류에이션", fundamentals.valuation)}
+          {fundamentalsRow("재무건전성", fundamentals.financial_health)}
         </div>
       )}
 

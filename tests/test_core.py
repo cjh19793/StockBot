@@ -9,15 +9,19 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from config import MC_CONFIG, MODE_CONFIG  # noqa: E402
+from fundamentals import (_financial_health_score, _growth_score,  # noqa: E402
+                          _interp, _profitability_score, _score_fundamentals,
+                          _valuation_score)
 from indicators import calc_indicators, get_value  # noqa: E402
 from market import _score_regime, _trend_score, _vix_score  # noqa: E402
 from models import (AnalysisResult, CompositeScore,  # noqa: E402
-                    MarketRegime, MonteCarloHold, MonteCarloResult)
+                    FundamentalsScore, MarketRegime, MonteCarloHold,
+                    MonteCarloResult)
 from report_format import (format_analysis_report,  # noqa: E402
                            format_montecarlo)
 from risk import compute_risk_score, compute_target_stop  # noqa: E402
-from scoring import (_market_subscore, _technical_subscore,  # noqa: E402
-                     compute_composite_score)
+from scoring import (_fundamentals_subscore, _market_subscore,  # noqa: E402
+                     _technical_subscore, compute_composite_score)
 from signals import detect_signal, final_judgment  # noqa: E402
 from validation import is_valid_ticker, resolve_mode  # noqa: E402
 
@@ -235,27 +239,99 @@ def test_market_subscore_none_fallback():
 
 
 def test_compute_composite_score_neutral_and_extremes():
+    # fundamentals 생략(None) → market 과 동일하게 중립(50)/사용불가로 폴백
     neutral = compute_composite_score(0, 0, None, 50)
     assert neutral.total == 50
     assert neutral.label == "Neutral"
     assert neutral.market_available is False
+    assert neutral.fundamentals == 50
+    assert neutral.fundamentals_available is False
 
     bullish_regime = MarketRegime(label="상승장", score=90, sp500_trend="", nasdaq_trend="", vix=12.0, vix_level="낮음")
-    strong = compute_composite_score(10, 0, bullish_regime, 90)
-    assert strong.total == round(100 * 0.5 + 90 * 0.25 + 90 * 0.25)
+    bullish_fundamentals = FundamentalsScore(
+        overall=90, label="우수", growth=90, profitability=90, valuation=90, financial_health=90,
+    )
+    strong = compute_composite_score(10, 0, bullish_regime, 90, bullish_fundamentals)
+    assert strong.total == round(100 * 0.4 + 90 * 0.2 + 90 * 0.2 + 90 * 0.2)
     assert strong.label == "Strong Buy"
     assert strong.market_available is True
+    assert strong.fundamentals == 90
+    assert strong.fundamentals_available is True
 
     bearish_regime = MarketRegime(label="하락장", score=10, sp500_trend="", nasdaq_trend="", vix=35.0, vix_level="공포")
-    weak = compute_composite_score(0, 9, bearish_regime, 10)
-    assert weak.total == round(0 * 0.5 + 10 * 0.25 + 10 * 0.25)
+    weak = compute_composite_score(0, 9, bearish_regime, 10)  # fundamentals 생략
+    assert weak.total == round(0 * 0.4 + 10 * 0.2 + 10 * 0.2 + 50 * 0.2)
     assert weak.label == "Strong Sell"
+    assert weak.fundamentals_available is False
+
+
+def test_fundamentals_subscore_none_fallback():
+    assert _fundamentals_subscore(None) == (50, False)
+    fs = FundamentalsScore(overall=80, label="우수", growth=80, profitability=80, valuation=80, financial_health=80)
+    assert _fundamentals_subscore(fs) == (80, True)
 
 
 def test_analysis_result_has_composite_field():
     r = _sample_result()
     assert isinstance(r.composite, CompositeScore)
     assert 0 <= r.composite.total <= 100
+    assert r.fundamentals is None  # 기본값, _sample_result 는 펀더멘털을 지정하지 않음
+
+
+# --- fundamentals.py ---
+
+def test_interp_bounds_and_midpoint():
+    points = [(0, 0), (10, 100)]
+    assert _interp(-5, points) == 0     # 하한 클램프
+    assert _interp(15, points) == 100   # 상한 클램프
+    assert _interp(5, points) == 50     # 중간 선형보간
+
+
+def test_growth_score_missing_fields_returns_none():
+    assert _growth_score({}) is None
+    assert _growth_score({"revenueGrowth": None}) is None
+
+
+def test_growth_score_uses_available_metric_only():
+    # revenueGrowth 만 있을 때: 0.10 → (0.0,50)~(0.10,75) 구간 상한 = 정확히 75
+    assert _growth_score({"revenueGrowth": 0.10}) == 75
+    # 둘 다 있으면 평균 (0.10→75, earningsGrowth 0.25→95) → round((75+95)/2)=85
+    assert _growth_score({"revenueGrowth": 0.10, "earningsGrowth": 0.25}) == 85
+
+
+def test_profitability_score_partial_data():
+    assert _profitability_score({}) is None
+    assert _profitability_score({"profitMargins": 0.20}) == 90
+
+
+def test_valuation_score_ignores_non_positive_values():
+    # PER<=0(적자)은 의미 없는 값이라 제외 — 다른 지표만으로 계산
+    assert _valuation_score({"trailingPE": -5, "priceToBook": 1}) == 90
+    assert _valuation_score({}) is None
+
+
+def test_financial_health_score_partial_data():
+    assert _financial_health_score({}) is None
+    assert _financial_health_score({"currentRatio": 2.0}) == 90
+
+
+def test_score_fundamentals_all_missing_returns_none():
+    assert _score_fundamentals({}) is None
+
+
+def test_score_fundamentals_full_profile_labels_excellent():
+    info = {
+        "revenueGrowth": 0.25, "earningsGrowth": 0.25,
+        "profitMargins": 0.20, "returnOnEquity": 0.25, "operatingMargins": 0.20,
+        "trailingPE": 10, "priceToBook": 1, "pegRatio": 0.5,
+        "debtToEquity": 0, "currentRatio": 2.0, "quickRatio": 1.5,
+    }
+    fs = _score_fundamentals(info)
+    assert isinstance(fs, FundamentalsScore)
+    assert fs.overall >= 70
+    assert fs.label == "우수"
+    assert fs.growth is not None and fs.profitability is not None
+    assert fs.valuation is not None and fs.financial_health is not None
 
 
 def test_validation_ticker_and_mode():

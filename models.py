@@ -19,8 +19,30 @@ class MarketRegime:
 
 
 @dataclass
+class FundamentalsScore:
+    """재무 데이터(yfinance Ticker.info) 기반 펀더멘털 점수 (0~100).
+
+    4개 하위 축(성장성/수익성/밸류에이션/재무건전성) 각각 계산 가능한 원자 지표가
+    하나도 없으면 해당 축은 None. overall 은 None 이 아닌 축들의 평균이며, 하나도
+    없으면(전부 None) get_fundamentals() 가 이 dataclass 자체를 만들지 않고 None 을
+    반환한다 (market_regime 과 동일한 "조회 실패/데이터 없음 → None" 관례).
+    """
+
+    overall: int            # 0~100, 계산 가능한 하위 축 평균
+    label: str               # "우수"/"양호"/"보통"/"주의"/"위험"
+    growth: int | None            # 성장성 (매출/이익 성장률)
+    profitability: int | None     # 수익성 (마진/ROE)
+    valuation: int | None         # 밸류에이션 (PER/PBR/PEG, 낮을수록 고점수)
+    financial_health: int | None  # 재무건전성 (부채비율/유동비율)
+
+
+@dataclass
 class CompositeScore:
-    """기술/시장환경/리스크를 가중합한 종합점수 (0~100)."""
+    """기술/시장환경/리스크/펀더멘털(P5)을 가중합한 종합점수 (0~100).
+
+    fundamentals/fundamentals_available 은 기본값을 둬서(P5 이전) 기존 코드가
+    이 6개 필드만으로 CompositeScore 를 만들던 자리를 그대로 둬도 깨지지 않게 한다.
+    """
 
     total: int          # 0~100
     label: str          # "Strong Buy" / "Buy" / "Neutral" / "Sell" / "Strong Sell"
@@ -28,6 +50,8 @@ class CompositeScore:
     market: int           # 0~100, market_regime.score 또는 중립(50) 폴백
     risk: int              # 0~100, 높을수록 안전(낮은 리스크)
     market_available: bool  # market_regime 조회 성공 여부 (실패 시 market=50 폴백 사용)
+    fundamentals: int = 50               # 0~100, fundamentals.overall 또는 중립(50) 폴백
+    fundamentals_available: bool = True  # fundamentals 조회 성공 여부 (실패 시 fundamentals=50 폴백 사용)
 
 
 @dataclass
@@ -83,6 +107,7 @@ class AnalysisResult:
     news_sentiment: str | None
     news_titles: list[str]
     market_regime: MarketRegime | None = None
+    fundamentals: FundamentalsScore | None = None
 
     # 차트 렌더링용 지표 포함 DataFrame (직렬화 대상 아님)
     df: object = field(default=None, repr=False)
