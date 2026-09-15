@@ -10,3 +10,10 @@ requests==2.34.2
 # 웹 API (webapi/) — 텔레그램 봇 실행에는 불필요
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
+
+# 사용자 계정/관심종목/알림 (Supabase Auth + Postgres) — 텔레그램 봇 실행에는 불필요
+sqlalchemy==2.0.53
+psycopg2-binary==2.9.13
+pyjwt==2.14.0
+cryptography==50.0.1
+python-dotenv==1.2.3

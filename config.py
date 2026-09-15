@@ -2,6 +2,12 @@
 import logging
 import os
 
+from dotenv import load_dotenv
+
+# 로컬 개발용 — 루트 .env 가 있으면 읽어온다(gitignore 처리됨). 이미 설정된 환경변수는
+# 덮어쓰지 않으므로(override=False, 기본값) Render 등 배포 환경에서 직접 주입한 값이 우선한다.
+load_dotenv()
+
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -88,3 +94,24 @@ CACHE_TTL_FUNDAMENTALS = 21600  # 6시간
 # 프론트 도메인이 정해지면 예: CORS_ORIGINS="https://stockbot.example.com,https://app.example.com"
 _cors_raw = os.environ.get("CORS_ORIGINS", "*").strip()
 CORS_ORIGINS = ["*"] if _cors_raw == "*" else [o.strip() for o in _cors_raw.split(",") if o.strip()]
+
+# --- Supabase (Auth + Postgres) — 관심종목/알림(watchlist/alerts) 기능용 ---
+# SUPABASE_URL 은 비밀값이 아니다(공개 API 엔드포인트, anon/publishable key 와 동일 성격).
+# 프로젝트를 옮기지 않는 한 바뀌지 않으므로 기본값으로 박아두고 필요시 환경변수로 덮어쓴다.
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ogufiijusghepvidfsrm.supabase.co").rstrip("/")
+# Supabase가 비대칭 서명(ES256, JWT Signing Keys)을 쓰므로 별도 시크릿 없이
+# JWKS 공개키로 토큰을 검증한다 (webapi/auth.py).
+SUPABASE_JWKS_URL = os.environ.get("SUPABASE_JWKS_URL", f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json")
+
+# DB 접속 정보(Session Pooler, IPv4). 비밀번호는 반드시 환경변수로만 주입 —
+# 코드/저장소에 두지 않는다. 하나라도 없으면 webapi/db.py 가 DB 기능을 비활성화한다
+# (기존 분석 API/텔레그램 봇은 DB 없이도 그대로 동작해야 하므로 앱을 죽이지 않는다).
+SUPABASE_DB_HOST = os.environ.get("SUPABASE_DB_HOST")
+SUPABASE_DB_PORT = int(os.environ.get("SUPABASE_DB_PORT", "5432"))
+SUPABASE_DB_USER = os.environ.get("SUPABASE_DB_USER")
+SUPABASE_DB_PASSWORD = os.environ.get("SUPABASE_DB_PASSWORD")
+SUPABASE_DB_NAME = os.environ.get("SUPABASE_DB_NAME", "postgres")
+
+# GitHub Actions 크론(.github/workflows/alert-check.yml)이 POST /api/internal/alerts/check
+# 호출 시 제시하는 공유 시크릿. 없으면 해당 엔드포인트가 전부 403을 반환한다.
+INTERNAL_ALERT_SECRET = os.environ.get("INTERNAL_ALERT_SECRET")

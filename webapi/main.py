@@ -17,7 +17,10 @@ from fastapi.staticfiles import StaticFiles
 
 from config import CORS_ORIGINS
 from errors import AnalysisError, TickerNotFound, UpstreamDataError
+from webapi.alerts_routes import internal_router as alerts_internal_router
+from webapi.alerts_routes import router as alerts_router
 from webapi.routes import router
+from webapi.watchlist_routes import router as watchlist_router
 
 log = logging.getLogger("webapi")
 
@@ -32,7 +35,9 @@ log.info("CORS 허용 도메인: %s", CORS_ORIGINS)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,  # 기본 "*" — 배포 시 CORS_ORIGINS 환경변수로 제한
-    allow_methods=["GET"],
+    # 기존엔 분석 API가 전부 GET이라 ["GET"]으로 충분했으나, watchlist/alerts가
+    # POST/PATCH/DELETE를 쓰므로 확장 — 그대로 두면 그 요청들의 CORS preflight가 막힌다.
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -78,6 +83,9 @@ async def _handle_unexpected_error(request: Request, exc: Exception):
 
 
 app.include_router(router)
+app.include_router(watchlist_router)
+app.include_router(alerts_router)
+app.include_router(alerts_internal_router)
 
 # Next.js 프론트(frontend/out, 정적 export 결과물을 미리 빌드해 커밋함 — Render
 # 빌드 환경엔 Node 가 없음)를 같은 서비스에서 정적으로 서빙한다. /health, /api/*,

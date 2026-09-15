@@ -1,0 +1,30 @@
+name: Alert check
+
+# Render 무료 웹서비스에는 백그라운드 워커/크론이 없으므로, 여기서 15분마다
+# /api/internal/alerts/check 를 호출해 사용자 알림 조건을 검사시킨다.
+# 부수 효과로 이 핑이 무료 서비스의 슬립(15분 유휴)도 어느 정도 막아준다.
+#
+# 필요한 저장소 Secret:
+#   INTERNAL_ALERT_SECRET — webapi 의 INTERNAL_ALERT_SECRET(config.py)과 동일한 값.
+#   (선택) STOCKBOT_API_BASE — 기본값 https://stockbot-api-ni3d.onrender.com 을 쓰지
+#   않을 경우에만 설정.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/internal/alerts/check
+        env:
+          INTERNAL_ALERT_SECRET: ${{ secrets.INTERNAL_ALERT_SECRET }}
+          API_BASE: ${{ secrets.STOCKBOT_API_BASE || 'https://stockbot-api-ni3d.onrender.com' }}
+        run: |
+          curl -sS -X POST "$API_BASE/api/internal/alerts/check" \
+            -H "X-Internal-Secret: $INTERNAL_ALERT_SECRET" \
+            -w "\nHTTP %{http_code}\n" \
+            --fail-with-body \
+            --max-time 60

@@ -5,6 +5,8 @@ models.AnalysisResult / MonteCarloResult 를 그대로 미러링한다.
 - bar_width 는 차트 렌더링 내부값이라 노출하지 않는다.
 `from_attributes=True` 로 dataclass 인스턴스에서 직접 검증한다.
 """
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -184,3 +186,60 @@ class SeriesResponse(BaseModel):
     atr: list[float | None]
     support: list[float | None]
     resistance: list[float | None]
+
+
+# --- 관심종목 / 알림 (Supabase Auth 로그인 사용자 전용) ---
+
+
+class WatchlistItemCreate(BaseModel):
+    ticker: str
+    mode: str | None = None  # 생략 시 '기본'
+
+
+class WatchlistItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    ticker: str
+    mode: str
+    created_at: datetime
+
+
+class AlertCreate(BaseModel):
+    ticker: str
+    mode: str | None = None  # 생략 시 '기본'
+    condition_type: str  # price_above / price_below / buy_score_above / sell_score_above
+    condition_value: float
+
+
+class AlertUpdate(BaseModel):
+    is_active: bool | None = None
+    condition_value: float | None = None
+
+
+class AlertResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    ticker: str
+    mode: str
+    condition_type: str
+    condition_value: float
+    is_active: bool
+    last_triggered_at: datetime | None
+    created_at: datetime
+
+
+class AlertEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    alert_id: str
+    message: str
+    is_read: bool
+    created_at: datetime
+
+
+class AlertCheckResponse(BaseModel):
+    checked: int
+    triggered: int

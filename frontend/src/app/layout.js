@@ -1,6 +1,7 @@
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import NavShell from "@/components/NavShell";
+import { AuthProvider } from "@/lib/authContext";
 
 const sans = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", weight: ["400", "500", "700"] });
@@ -17,7 +18,9 @@ export default function RootLayout({ children }) {
       <body className="min-h-screen bg-bg font-sans text-ink antialiased">
         <div className="fixed inset-0 z-0 bg-dot-grid opacity-[0.15]" />
         <div className="relative z-10 flex min-h-screen flex-col">
-          <NavShell>{children}</NavShell>
+          <AuthProvider>
+            <NavShell>{children}</NavShell>
+          </AuthProvider>
         </div>
       </body>
     </html>
