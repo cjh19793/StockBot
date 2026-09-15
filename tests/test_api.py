@@ -238,6 +238,33 @@ def test_chart_png():
     assert r.content[:8] == b"\x89PNG\r\n\x1a\n"
 
 
+def test_series_ok():
+    from webapi.routes import _build_series_data
+    _build_series_data.cache_clear()
+    with mock_analysis():
+        r = client.get("/api/series/AAPL")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ticker"] == "AAPL"
+    assert body["mode"] == "기본"
+    assert body["interval"] == "1d"
+    n = len(body["dates"])
+    assert n == 180
+    for key in ("open", "high", "low", "close", "volume", "ma5", "ma20", "ma60",
+                "bb_upper", "bb_lower", "rsi", "macd", "macd_signal", "macd_hist",
+                "stoch_k", "stoch_d", "atr", "support", "resistance"):
+        assert len(body[key]) == n, key
+    # 초반 구간은 rolling window 미충족으로 null, 후반은 값이 있어야 함
+    assert body["ma20"][0] is None
+    assert body["ma20"][-1] is not None
+    assert isinstance(body["close"][-1], float)
+
+
+def test_series_invalid_ticker():
+    r = client.get("/api/series/$$$")
+    assert r.status_code == 422, r.text
+
+
 def test_montecarlo_ok():
     from montecarlo import _get_mc_df
     _get_mc_df.cache_clear()

@@ -79,18 +79,19 @@ async def _handle_unexpected_error(request: Request, exc: Exception):
 
 app.include_router(router)
 
-# React 프론트(frontend/dist, 미리 빌드해 커밋됨 — Render 빌드 환경엔 Node 가 없음)를
-# 같은 서비스에서 정적으로 서빙한다. /health, /api/*, /docs 등은 위에서 먼저
-# 등록됐으므로 우선 매칭되고, 그 외 경로만 이 아래로 떨어져 index.html 로 간다
-# (SPA 라우팅 없이 단일 화면 + 탭 전환이라 별도 fallback 라우트는 불필요).
+# Next.js 프론트(frontend/out, 정적 export 결과물을 미리 빌드해 커밋함 — Render
+# 빌드 환경엔 Node 가 없음)를 같은 서비스에서 정적으로 서빙한다. /health, /api/*,
+# /docs 등은 위에서 먼저 등록됐으므로 우선 매칭되고, 그 외 경로만 이 아래로 떨어져
+# 각 라우트의 index.html 로 간다 (next.config.mjs 의 trailingSlash:true 덕에
+# /analyze 요청도 frontend/out/analyze/index.html 로 해석됨).
 # 로컬에서 API만 띄우는 기존 개발 흐름(`uvicorn webapi.main:app --reload`)은
-# dist 가 없으면 그냥 마운트를 건너뛰고 그대로 동작한다.
-_FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+# out 이 없으면 그냥 마운트를 건너뛰고 그대로 동작한다.
+_FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "out")
 if os.path.isdir(_FRONTEND_DIST):
     app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")
     log.info("프론트엔드 정적 파일 서빙: %s", _FRONTEND_DIST)
 else:
-    log.info("frontend/dist 없음 — API만 서빙 (프론트 빌드 필요 시 frontend/에서 npm run build)")
+    log.info("frontend/out 없음 — API만 서빙 (프론트 빌드 필요 시 frontend/에서 npm run build)")
 
 
 def main():

@@ -5,6 +5,7 @@
 이벤트 루프를 블로킹하지 않는다 — 전체를 async 로 재작성하지 않는다.
 """
 import logging
+import math
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, HTTPException, Path, Query
@@ -186,6 +187,63 @@ def chart(
         media_type="image/png",
         headers={"Cache-Control": f"public, max-age={CACHE_TTL_CHART}"},
     )
+
+
+def _col_to_list(series) -> list[float | None]:
+    """pandas Series -> JSON 직렬화 가능한 리스트 (NaN -> None)."""
+    return [None if (v is None or (isinstance(v, float) and math.isnan(v))) else float(v) for v in series]
+
+
+@ttl_cache(CACHE_TTL_CHART)
+def _build_series_data(ticker: str, mode: str) -> schemas.SeriesResponse:
+    """티커+모드 기준 차트용 시계열. run_analysis 의 df를 그대로 배열로 펼친다.
+
+    _build_chart_png 와 동일한 캐시 수명을 쓴다 — 어차피 같은 run_analysis(캐싱된
+    get_df 위에서 계산) 결과를 소비하므로 새로 만들 이유가 없다.
+    """
+    result = run_analysis(ticker, mode)
+    df = result.df
+    interval = MODE_CONFIG.get(mode, MODE_CONFIG["기본"])["interval"]
+    date_fmt = "%Y-%m-%d" if interval == "1d" else "%Y-%m-%d %H:%M"
+    return schemas.SeriesResponse(
+        ticker=result.ticker,
+        mode=mode,
+        interval=interval,
+        dates=[d.strftime(date_fmt) for d in df.index],
+        open=_col_to_list(df["Open"]),
+        high=_col_to_list(df["High"]),
+        low=_col_to_list(df["Low"]),
+        close=_col_to_list(df["Close"]),
+        volume=_col_to_list(df["Volume"]),
+        ma5=_col_to_list(df["MA5"]),
+        ma20=_col_to_list(df["MA20"]),
+        ma60=_col_to_list(df["MA60"]),
+        bb_upper=_col_to_list(df["Upper"]),
+        bb_lower=_col_to_list(df["Lower"]),
+        rsi=_col_to_list(df["RSI"]),
+        macd=_col_to_list(df["MACD"]),
+        macd_signal=_col_to_list(df["MACD_signal"]),
+        macd_hist=_col_to_list(df["MACD_hist"]),
+        stoch_k=_col_to_list(df["Stoch_K"]),
+        stoch_d=_col_to_list(df["Stoch_D"]),
+        atr=_col_to_list(df["ATR"]),
+        support=_col_to_list(df["Support"]),
+        resistance=_col_to_list(df["Resistance"]),
+    )
+
+
+@router.get(
+    "/api/series/{ticker}",
+    response_model=schemas.SeriesResponse,
+    tags=["analysis"],
+)
+def series(
+    ticker: str = Path(..., description="미국 주식 티커 (예: AAPL)"),
+    mode: str | None = Query(None, description="분석 모드 (analyze 와 동일)"),
+):
+    t = _clean_ticker(ticker)
+    m = _resolve_mode_param(mode, MODE_CONFIG)
+    return _build_series_data(t, m)
 
 
 @router.get(

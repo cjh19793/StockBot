@@ -14,8 +14,8 @@
 # 이 Blueprint가 더 이상 어떤 서비스도 소유/재생성하지 않게 하기 위함 — 서비스
 # 정의를 남겨두면 다음 Blueprint sync 때 삭제한 서비스가 되살아난다.
 #
-# 프론트엔드(React/Vite)는 별도 서비스로 만들지 않고 같은 서비스에서 정적으로
-# 서빙한다 (webapi/main.py 가 frontend/dist 를 마운트) — 새 무료 리소스를 늘리지
-# 않기 위함. 이 빌드 환경엔 Node 가 없으므로 frontend/dist 는 미리 빌드해 커밋한
-# 상태로 배포한다 (frontend/ 에서 `npm run build` 후 커밋).
+# 프론트엔드(Next.js, 정적 export)는 별도 서비스로 만들지 않고 같은 서비스에서
+# 정적으로 서빙한다 (webapi/main.py 가 frontend/out 을 마운트) — 새 무료 리소스를
+# 늘리지 않기 위함. 이 빌드 환경엔 Node 가 없으므로 frontend/out 은 미리 빌드해
+# 커밋한 상태로 배포한다 (frontend/ 에서 `npm run build` 후 커밋).
 services: []

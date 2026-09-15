@@ -2,16 +2,15 @@
 logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
 node_modules
-# dist 는 커밋한다 — Render 빌드 환경에 Node 가 없어 FastAPI(webapi/main.py)가
-# 이 미리 빌드된 정적 파일을 그대로 서빙한다. 프론트 소스 변경 시 반드시
-# `npm run build` 후 frontend/dist 를 함께 커밋할 것.
-dist-ssr
+
+# Next.js build output — .next 는 무시하지만 정적 export 결과물인 out/ 은 커밋한다.
+# Render 빌드 환경엔 Node 가 없어 FastAPI(webapi/main.py)가 미리 빌드된 out/ 을
+# 그대로 서빙한다. 프론트 소스 변경 시 반드시 `npm run build` 후 frontend/out 을
+# 함께 커밋할 것.
+.next/
+!out/
 *.local
 
 # Editor directories and files

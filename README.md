@@ -37,32 +37,35 @@ python app.py
 | --- | --- |
 | `GET /health` | 상태 확인 |
 | `GET /api/modes` | 지원 분석/몬테카를로 모드 + 별칭 |
-| `GET /api/analyze/{ticker}?mode=` | 분석 결과 JSON (`engine.run_analysis`, P3 종합점수 + P5 펀더멘털 포함) |
-| `GET /api/chart/{ticker}.png?mode=` | 분석 차트 PNG (`charts.build_chart`) |
+| `GET /api/analyze/{ticker}?mode=` | 분석 결과 JSON (`engine.run_analysis`, P3 종합점수 + P5 펀더멘털 포함, 지표는 최신값 스냅샷) |
+| `GET /api/series/{ticker}?mode=` | 차트용 시계열 JSON (OHLCV + MA/BB/RSI/MACD/Stoch 등, 프론트 recharts 렌더링용) |
+| `GET /api/chart/{ticker}.png?mode=` | 분석 차트 PNG (`charts.build_chart`, 텔레그램 봇용 — 프론트는 `/api/series` 사용) |
 | `GET /api/montecarlo/{ticker}?mode=&simulations=` | 부트스트랩 시뮬레이션 JSON |
 | `GET /api/compare?tickers=A,B,C&mode=` | 2~10개 종목 비교 JSON (`results`/`errors` — 실패 종목이 있어도 나머지는 정상 반환) |
 
 `mode` 는 봇과 동일한 값/별칭(`기본`·`단타`·`스윙`, `5m`·`1h`·`1d` …, MC 는 `장기` 추가). 없으면 `기본`.
 `TickerNotFound` → 404, `UpstreamDataError` → 502, 잘못된 티커/모드 → 422.
 
-### 웹 프론트엔드 (React/Vite)
+### 웹 프론트엔드 (Next.js)
 
-`frontend/` — 종합점수/기술·시장환경·리스크·펀더멘털/목표가·손절가/차트를 보여주는 단일 분석 화면과
-`/api/compare` 를 사용하는 종목 비교 화면(2~10개, 점수순 정렬, 개별 오류 표시)으로 구성.
+`frontend/` — 다크 네이비/앰버 테마의 4개 화면: 랜딩(`/`), 종목 분석(`/analyze`,
+가격+MA/BB 차트와 RSI/MACD/스토캐스틱 서브차트를 recharts 로 렌더링 + 종합점수/신호 요약),
+종목 비교(`/compare`, `/api/compare` 사용, 2~10개 점수순 정렬), 몬테카를로(`/montecarlo`).
 프론트는 백엔드 계산값을 표시만 하며 점수/판정을 자체적으로 계산하지 않는다.
 
 ```bash
 cd frontend
 npm install
-npm run dev       # http://localhost:5173, API는 VITE_API_BASE_URL(.env) 사용
+npm run dev       # http://localhost:3000, API는 NEXT_PUBLIC_API_BASE_URL(.env/.env.local) 사용
 ```
 
-배포 시에는 `webapi/main.py` 가 **같은 FastAPI 서비스**에서 `frontend/dist` 를 정적으로
-서빙한다(새 서비스 추가 없음). Render 빌드 환경에 Node 가 없어 이 방식을 쓰므로,
-프론트 소스를 바꾸면 반드시 아래처럼 다시 빌드해 `frontend/dist` 를 함께 커밋해야 배포에 반영된다.
+배포 시에는 `webapi/main.py` 가 **같은 FastAPI 서비스**에서 정적 export 결과물인
+`frontend/out` 을 정적으로 서빙한다(새 서비스 추가 없음). Render 빌드 환경에 Node 가
+없어 이 방식을 쓰므로, 프론트 소스를 바꾸면 반드시 아래처럼 다시 빌드해 `frontend/out` 을
+함께 커밋해야 배포에 반영된다.
 
 ```bash
-cd frontend && npm run build   # frontend/dist 갱신 → git add frontend/dist 후 커밋
+cd frontend && npm run build   # frontend/out 갱신 (next.config.mjs: output:"export") → git add frontend/out 후 커밋
 ```
 
 ### 배포 (Render — 웹 API + 프론트)

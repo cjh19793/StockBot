@@ -151,3 +151,36 @@ class ModesResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     service: str
+
+
+class SeriesResponse(BaseModel):
+    """차트용 시계열 (프론트에서 recharts 등으로 직접 렌더링).
+
+    engine.run_analysis() 가 만드는 지표 포함 DataFrame을 그대로 배열로 펼친 것.
+    NaN(지표 계산에 필요한 초기 구간 등)은 null 로 내려간다.
+    기존 AnalysisResponse(스냅샷 값)는 그대로 두고 이 스키마는 순수 추가.
+    """
+
+    ticker: str
+    mode: str
+    interval: str
+    dates: list[str]
+    open: list[float | None]
+    high: list[float | None]
+    low: list[float | None]
+    close: list[float | None]
+    volume: list[float | None]
+    ma5: list[float | None]
+    ma20: list[float | None]
+    ma60: list[float | None]
+    bb_upper: list[float | None]
+    bb_lower: list[float | None]
+    rsi: list[float | None]
+    macd: list[float | None]
+    macd_signal: list[float | None]
+    macd_hist: list[float | None]
+    stoch_k: list[float | None]
+    stoch_d: list[float | None]
+    atr: list[float | None]
+    support: list[float | None]
+    resistance: list[float | None]
