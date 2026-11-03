@@ -50,20 +50,20 @@ export default function AnalyzePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-pretendard">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">종목 분석</h1>
-        <p className="mt-1.5 text-[14px] text-ink-dim">티커를 입력하면 기술적 지표를 조합해 매수/매도 신호를 계산합니다.</p>
+        <p className="mt-1.5 text-[14px] text-ink-label">티커를 입력하면 기술적 지표를 조합해 매수/매도 신호를 계산합니다.</p>
       </div>
 
       <Card>
         <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-4">
           <div className="min-w-[200px] flex-1">
-            <label htmlFor="ticker" className="mb-1.5 block text-[12.5px] text-ink-faint">티커</label>
+            <label htmlFor="ticker" className="mb-1.5 block text-[13.5px] text-ink-label">티커</label>
             <TickerInput id="ticker" value={ticker} onChange={setTicker} maxLength={10} />
           </div>
           <div>
-            <label className="mb-1.5 block text-[12.5px] text-ink-faint">분석 모드</label>
+            <label className="mb-1.5 block text-[13.5px] text-ink-label">분석 모드</label>
             <ModeSegmented modes={modes} value={mode} onChange={setMode} ariaLabel="분석 모드" />
           </div>
           <button
@@ -80,7 +80,7 @@ export default function AnalyzePage() {
       {error && <ErrorMessage>{error}</ErrorMessage>}
       {result && series && <AnalysisView result={result} series={series} />}
 
-      <p className="pt-2 text-center text-[12px] text-ink-faint">모든 결과는 참고용이며 투자 권유가 아닙니다.</p>
+      <p className="pt-2 text-center text-[12.5px] text-ink-label">모든 결과는 참고용이며 투자 권유가 아닙니다.</p>
     </div>
   );
 }

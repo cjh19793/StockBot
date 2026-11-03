@@ -15,6 +15,12 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ko" className={`${sans.variable} ${mono.variable}`}>
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+        />
+      </head>
       <body className="min-h-screen bg-bg font-sans text-ink antialiased">
         <div className="fixed inset-0 z-0 bg-dot-grid opacity-[0.15]" />
         <div className="relative z-10 flex min-h-screen flex-col">

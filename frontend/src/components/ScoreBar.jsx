@@ -3,12 +3,12 @@ export default function ScoreBar({ label, value }) {
   const pct = Math.max(0, Math.min(100, value));
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-between text-[13px]">
-        <span className="text-ink-dim">{label}</span>
-        <b className="font-mono">{value}</b>
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <span className="text-[14px] text-ink-label">{label}</span>
+        <b className="text-[18px] font-semibold tabular-nums">{value}</b>
       </div>
-      <div className="h-1.5 rounded-full bg-bg-raised">
-        <div className="h-1.5 rounded-full bg-amber" style={{ width: `${pct}%` }} />
+      <div className="h-2 rounded-full bg-bg-raised">
+        <div className="h-2 rounded-full bg-amber" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

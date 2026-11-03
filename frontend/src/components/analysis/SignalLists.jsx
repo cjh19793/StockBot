@@ -22,31 +22,31 @@ export default function SignalLists({ result }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Card className="border-up/20">
-        <h3 className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-up">
+        <h3 className="mb-3 flex items-center gap-2 text-[15px] font-semibold text-up">
           <ArrowUp /> 매수 신호 ({r.buy_score}점)
         </h3>
         {r.buy_signals.length > 0 ? (
-          <ul className="space-y-2 text-[13px] text-ink-dim">
+          <ul className="space-y-2 text-[14px] text-ink-label">
             {r.buy_signals.map((s, i) => (
               <li key={i} className="border-l-2 border-up/40 pl-2.5">{s}</li>
             ))}
           </ul>
         ) : (
-          <p className="text-[13px] text-ink-faint">없음</p>
+          <p className="text-[14px] text-ink-label">없음</p>
         )}
       </Card>
       <Card className="border-down/20">
-        <h3 className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-down">
+        <h3 className="mb-3 flex items-center gap-2 text-[15px] font-semibold text-down">
           <ArrowDown /> 매도 신호 ({r.sell_score}점)
         </h3>
         {r.sell_signals.length > 0 ? (
-          <ul className="space-y-2 text-[13px] text-ink-dim">
+          <ul className="space-y-2 text-[14px] text-ink-label">
             {r.sell_signals.map((s, i) => (
               <li key={i} className="border-l-2 border-down/40 pl-2.5">{s}</li>
             ))}
           </ul>
         ) : (
-          <p className="text-[13px] text-ink-faint">없음</p>
+          <p className="text-[14px] text-ink-label">없음</p>
         )}
       </Card>
     </div>

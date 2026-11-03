@@ -12,6 +12,7 @@ export default {
         ink: "#E8EAED",
         "ink-dim": "#8891A3",
         "ink-faint": "#545E70",
+        "ink-label": "#C5CCDA",
         amber: "#FFB454",
         "amber-dim": "#8A6428",
         up: "#3DDC84",
@@ -20,6 +21,7 @@ export default {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "-apple-system", "Pretendard", "Apple SD Gothic Neo", "sans-serif"],
+        pretendard: ["Pretendard Variable", "Pretendard", "-apple-system", "Apple SD Gothic Neo", "Malgun Gothic", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "SF Mono", "Consolas", "monospace"],
       },
       backgroundImage: {
